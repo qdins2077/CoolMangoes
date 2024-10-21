@@ -1,2 +1,0 @@
-CsvHelper==33.0.1
-EPPlus==7.4.1
