@@ -1,0 +1,133 @@
+﻿<Window x:Class="CoolMangoes.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Cool Mangoes LCC Tool" Height="900" Width="1200"
+        Background="#F7F7F7">
+
+    <Window.Resources>
+        <!-- Button Style -->
+        <Style x:Key="ActionButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#4ECDC4"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Padding" Value="15,10"/> <!-- Increased Padding -->
+            <Setter Property="Margin" Value="15,15"/> <!-- Increased Margin -->
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="18"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="20" SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Style for Selected Page Button (with larger Shadow) -->
+        <Style x:Key="SelectedActionButtonStyle" TargetType="Button" BasedOn="{StaticResource ActionButtonStyle}">
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect Color="Black" BlurRadius="25" ShadowDepth="3" Opacity="0.6"/>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="Background" Value="#FF6B6B"/>  <!-- Red Highlight for the selected button -->
+        </Style>
+
+        <!-- Style for Red Button with Download Icon -->
+        <Style x:Key="RedActionButtonStyle" TargetType="Button" BasedOn="{StaticResource ActionButtonStyle}">
+            <Setter Property="Background" Value="#FF6B6B"/>  <!-- Red Button -->
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>  <!-- Header Row -->
+            <RowDefinition Height="Auto"/>  <!-- Navigation Menu Row -->
+            <RowDefinition Height="Auto"/>  <!-- Note Section -->
+            <RowDefinition Height="*"/>     <!-- Main Content (Downloads/Uploads) -->
+            <RowDefinition Height="Auto"/>  <!-- Calculation and Footer Section -->
+        </Grid.RowDefinitions>
+
+        <!-- Header Section -->
+        <DockPanel Grid.Row="0" LastChildFill="True" Background="#FF6B6B" Height="70">
+            <TextBlock Text="Cool Mangoes" FontSize="36" FontWeight="Bold" Foreground="White" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+        </DockPanel>
+
+        <!-- Navigation Menu (Centered) -->
+        <DockPanel Grid.Row="1" Background="#4ECDC4" Height="50" VerticalAlignment="Top">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <!-- Selected page (Data) with shadow effect -->
+                <Button Content="Data" Style="{StaticResource SelectedActionButtonStyle}" Width="120" Click="ShowDataSection"/>
+                <!-- LCC Model (Placeholder for future window) -->
+                <Button Content="LCC Model" Style="{StaticResource ActionButtonStyle}" Width="120" Click="ShowLCCSection"/>
+                <!-- Maintenance Model (Placeholder for future window) -->
+                <Button Content="Maintenance Model" Style="{StaticResource ActionButtonStyle}" Width="170" Click="ShowMaintenanceSection"/>
+            </StackPanel>
+        </DockPanel>
+
+        <!-- Note Section -->
+        <StackPanel Grid.Row="2" VerticalAlignment="Top" Margin="10" HorizontalAlignment="Center">
+            <Border Background="#FFD93D" Padding="10" Width="950" CornerRadius="10">
+                <TextBlock Text="Please follow the steps in order for the best results!" FontSize="18" FontWeight="Bold" Foreground="#333333" HorizontalAlignment="Center"/>
+            </Border>
+        </StackPanel>
+
+        <!-- Main Content: Downloads and Uploads -->
+        <Grid Grid.Row="3" Margin="0,20,0,20" HorizontalAlignment="Center">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="1.5*"/>
+                <ColumnDefinition Width="1.5*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Downloads Section -->
+            <StackPanel Grid.Column="0" Margin="15">
+                <TextBlock Text="Download Templates" FontSize="24" FontWeight="Bold" Foreground="#FF6B6B" Margin="10,20,10,5"/>
+                <Button Content="1. AssetData" Style="{StaticResource ActionButtonStyle}" Click="DownloadAssetData_Click"/>
+                <Button Content="3. ClassData" Style="{StaticResource ActionButtonStyle}" Click="DownloadClassData_Click"/>
+                <Button Content="5. MaintenanceStrategies" Style="{StaticResource ActionButtonStyle}" Click="DownloadMaintenanceStrategies_Click"/>
+                <Button Content="7. MaintenanceProcedures" Style="{StaticResource ActionButtonStyle}" Click="DownloadMaintenanceProcedures_Click"/>
+            </StackPanel>
+
+            <!-- Uploads Section (Centered Title) -->
+            <StackPanel Grid.Column="1" Margin="15">
+                <TextBlock Text="Upload Data" FontSize="24" FontWeight="Bold" Foreground="#FF6B6B" Margin="10,20,10,5" HorizontalAlignment="Center"/>
+                <Button Content="2. AssetData" Style="{StaticResource ActionButtonStyle}" Click="UploadAssetData_Click"/>
+                <Button Content="4. ClassData" Style="{StaticResource ActionButtonStyle}" Click="UploadClassData_Click"/>
+                <Button Content="6. MaintenanceStrategies" Style="{StaticResource ActionButtonStyle}" Click="UploadMaintenanceStrategies_Click"/>
+                <Button Content="8. MaintenanceProcedures" Style="{StaticResource ActionButtonStyle}" Click="UploadMaintenanceProcedures_Click"/>
+            </StackPanel>
+        </Grid>
+
+        <!-- Calculation Section -->
+        <StackPanel Grid.Row="4" VerticalAlignment="Bottom" Margin="20">
+            <TextBlock Text="Corrective Method" FontSize="18" FontWeight="Bold" Margin="10" HorizontalAlignment="Center"/>
+
+            <!-- Radio Button Group for Corrective Method -->
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="10">
+                <RadioButton GroupName="CorrectiveMethod" Content="Flat (58% PM)" IsChecked="True" Margin="10"/>
+                <RadioButton GroupName="CorrectiveMethod" Content="Condition Based" Margin="10"/>
+            </StackPanel>
+
+            <!-- Calculate and Download Cost Model Buttons with Red Download Button -->
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="20">
+                <Button Content="Calculate" Style="{StaticResource ActionButtonStyle}" Click="CalculateButton_Click"/>
+                <Button Style="{StaticResource RedActionButtonStyle}" Click="DownloadCostModelButton_Click">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                <!-- Text for the button -->
+                <TextBlock Text="Cost Model" VerticalAlignment="Center"/>
+                <!-- Download icon next to the text -->
+                <Image Source="/Resources/download-icon.png" Width="16" Height="16" Margin="5,0,0,0" VerticalAlignment="Center"/>
+            </StackPanel>
+        </Button>
+            </StackPanel>
+        </StackPanel>
+
+        <!-- Status Messages and Calculation State -->
+        <StackPanel Name="CalculationStatusPanel" Visibility="Collapsed" Margin="20" VerticalAlignment="Center">
+            <TextBlock Text="Calculating... Please wait." FontSize="18" FontWeight="Bold" Foreground="DarkRed" HorizontalAlignment="Center"/>
+        </StackPanel>
+    </Grid>
+</Window>
