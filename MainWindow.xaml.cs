@@ -2,6 +2,9 @@
 using System;
 using System.IO;
 using System.Windows;
+using System.Windows.Controls; // Add this line to resolve DatePicker errors
+using System.Collections.Generic;
+using System.Linq;
 using System.Collections.Generic;
 using CoolMangoes.Modules;
 using CoolMangoes.Models;  // For using Asset and ClassData classes
@@ -17,8 +20,14 @@ namespace CoolMangoes
         private readonly MaintenanceProceduresService maintenanceProceduresService;
 
         // Hold the uploaded asset and class data in memory after it's uploaded
-        private List<Asset> uploadedAssetDataList = null;
-        private List<ClassData> uploadedClassDataList = null;
+        private List<Asset> uploadedAssetDataList;
+        private List<ClassData> uploadedClassDataList;
+
+        public DateTime? ProjectStartDate { get; set; }
+        public DateTime? ProjectEndDate { get; set; }
+        // private List<Expenditure> calculatedExpenditurePlan;
+        private List<MaintenanceProcedure> uploadedMaintenanceProceduresList;
+
 
         public MainWindow()
         {
@@ -61,6 +70,36 @@ namespace CoolMangoes
                 MessageBox.Show($"An error occurred during the download: {ex.Message}");
             }
         }
+        private void UploadAssetData_Click(object sender, RoutedEventArgs e)
+        {
+            OpenFileDialog openFileDialog = new OpenFileDialog
+            {
+                Filter = "CSV files (*.csv)|*.csv"
+            };
+
+            if (openFileDialog.ShowDialog() == true)
+            {
+                try
+                {
+                    string filePath = openFileDialog.FileName;
+                    uploadedAssetDataList = assetDataService.LoadAssetData(filePath);  // Store the uploaded data
+
+                    if (uploadedAssetDataList == null || uploadedAssetDataList.Count == 0)
+                    {
+                        MessageBox.Show("Failed to load Asset Data.");
+                    }
+                    else
+                    {
+                        MessageBox.Show($"File processed successfully. Total records: {uploadedAssetDataList.Count}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"An error occurred during file upload: {ex.Message}");
+                }
+            }
+        }
+
 
         // Downloads ClassData template based on processed AssetData and saves to Downloads folder
         private void DownloadClassData_Click(object sender, RoutedEventArgs e)
@@ -151,27 +190,27 @@ namespace CoolMangoes
         }
 
         // Uploads AssetData from a CSV file
-        private void UploadAssetData_Click(object sender, RoutedEventArgs e)
-        {
-            OpenFileDialog openFileDialog = new OpenFileDialog
-            {
-                Filter = "CSV files (*.csv)|*.csv"
-            };
+        // private void UploadAssetData_Click(object sender, RoutedEventArgs e)
+        // {
+        //     OpenFileDialog openFileDialog = new OpenFileDialog
+        //     {
+        //         Filter = "CSV files (*.csv)|*.csv"
+        //     };
 
-            if (openFileDialog.ShowDialog() == true)
-            {
-                try
-                {
-                    string filePath = openFileDialog.FileName;
-                    uploadedAssetDataList = assetDataService.LoadAssetData(filePath);  // Store the uploaded data
-                    MessageBox.Show($"File processed successfully. Total records: {uploadedAssetDataList.Count}");
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show($"An error occurred during file upload: {ex.Message}");
-                }
-            }
-        }
+        //     if (openFileDialog.ShowDialog() == true)
+        //     {
+        //         try
+        //         {
+        //             string filePath = openFileDialog.FileName;
+        //             uploadedAssetDataList = assetDataService.LoadAssetData(filePath);  // Store the uploaded data
+        //             MessageBox.Show($"File processed successfully. Total Asset records: {uploadedAssetDataList.Count}");
+        //         }
+        //         catch (Exception ex)
+        //         {
+        //             MessageBox.Show($"An error occurred during file upload: {ex.Message}");
+        //         }
+        //     }
+        // }
 
         // Uploads ClassData from a CSV file
         private void UploadClassData_Click(object sender, RoutedEventArgs e)
@@ -191,7 +230,7 @@ namespace CoolMangoes
                     uploadedClassDataList = classDataService.LoadClassData(filePath);
 
                     // Show the total number of records processed
-                    MessageBox.Show($"File processed successfully. Total records: {uploadedClassDataList.Count}");
+                    MessageBox.Show($"File processed successfully. Total Class records: {uploadedClassDataList.Count}");
                 }
                 catch (Exception ex)
                 {
@@ -239,15 +278,152 @@ namespace CoolMangoes
                 try
                 {
                     // Load Maintenance Procedures using MaintenanceProceduresService
-                    var proceduresList = maintenanceProceduresService.LoadMaintenanceProcedures(filePath);
-                    MessageBox.Show($"File processed successfully. Total Maintenance Procedures: {proceduresList.Count}");
+                    uploadedMaintenanceProceduresList = maintenanceProceduresService.LoadMaintenanceProcedures(filePath);  // Assign to the correct variable
+
+                    if (uploadedMaintenanceProceduresList == null || uploadedMaintenanceProceduresList.Count == 0)
+                    {
+                        MessageBox.Show("Failed to load Maintenance Procedures data or the list is empty.");
+                    }
+                    else
+                    {
+                        MessageBox.Show($"Maintenance Procedures data loaded successfully. Total records: {uploadedMaintenanceProceduresList.Count}");
+                    }
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"An error occurred during file upload: {ex.Message}");
+                    MessageBox.Show($"An error occurred during Maintenance Procedures file upload: {ex.Message}");
                 }
             }
         }
+
+
+        // Handler for Flat (58% PM) corrective method
+        private void FlatMethodButton_Click(object sender, RoutedEventArgs e)
+        {
+            MessageBox.Show("Flat (58% PM) method selected.");
+            // You can add logic for handling this method here
+        }
+
+        // Handler for Condition Based corrective method
+        private void ConditionBasedMethodButton_Click(object sender, RoutedEventArgs e)
+        {
+            MessageBox.Show("Condition Based method selected.");
+            // You can add logic for handling this method here
+        }
+
+        // Project Start Date Calendar Selection
+        private void ProjectStartDate_SelectedDateChanged(object sender, RoutedEventArgs e)
+        {
+            if (sender is DatePicker picker && picker.SelectedDate.HasValue)
+            {
+                ProjectStartDate = picker.SelectedDate.Value;
+                MessageBox.Show($"Project Start Date: {ProjectStartDate.Value.ToShortDateString()}");
+            }
+        }
+
+        // Project End Date Calendar Selection
+        // Project End Date Calendar Selection
+        private void ProjectEndDate_SelectedDateChanged(object sender, RoutedEventArgs e)
+        {
+            if (sender is DatePicker picker && picker.SelectedDate.HasValue)
+            {
+                ProjectEndDate = picker.SelectedDate.Value;
+                MessageBox.Show($"Project End Date: {ProjectEndDate.Value.ToShortDateString()}");
+            }
+        }
+
+
+        // Handler for LCC Model Calculate Button
+        
+        private void CalculateLCCModel_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // Check if Asset data is loaded
+                if (uploadedAssetDataList == null)
+                {
+                    MessageBox.Show("Asset data list is null.");
+                    return;
+                }
+                if (uploadedAssetDataList.Count == 0)
+                {
+                    MessageBox.Show("Asset data list is empty.");
+                    return;
+                }
+
+                // Check if Class data is loaded
+                if (uploadedClassDataList == null)
+                {
+                    MessageBox.Show("Class data list is null.");
+                    return;
+                }
+                if (uploadedClassDataList.Count == 0)
+                {
+                    MessageBox.Show("Class data list is empty.");
+                    return;
+                }
+
+                // Check if Maintenance Procedures data is loaded
+                if (uploadedMaintenanceProceduresList == null)
+                {
+                    MessageBox.Show("Maintenance Procedures data list is null.");
+                    return;
+                }
+                if (uploadedMaintenanceProceduresList.Count == 0)
+                {
+                    MessageBox.Show("Maintenance Procedures data list is empty.");
+                    return;
+                }
+
+                // Ensure ProjectStartDate and ProjectEndDate are selected
+                if (ProjectStartDate == null || ProjectEndDate == null)
+                {
+                    MessageBox.Show("Please select a Project Start Date and Project End Date.");
+                    return;
+                }
+
+                // Pass the selected project start and end dates into the service
+                var expenditurePlanService = new ExpenditurePlanService(
+                    uploadedAssetDataList, 
+                    uploadedClassDataList, 
+                    uploadedMaintenanceProceduresList, 
+                    ProjectStartDate.Value, 
+                    ProjectEndDate.Value);
+
+                var expenditurePlans = expenditurePlanService.GenerateExpenditurePlan();
+
+                // Handle the calculated expenditure plans (store, display, etc.)
+                MessageBox.Show("Calculation completed successfully!");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"An error occurred: {ex.Message}");
+            }
+        }
+
+
+
+        // Handler for LCC Model Download Button
+        private void DownloadLCCModel_Click(object sender, RoutedEventArgs e)
+        {
+            
+        }
+
+
+        // Handler for AMP Model Calculate Button
+        private void CalculateAMPModel_Click(object sender, RoutedEventArgs e)
+        {
+            MessageBox.Show("Calculating AMP Model...");
+            // Add your AMP Model calculation logic here
+        }
+
+        // Handler for AMP Model Download Button
+        private void DownloadAMPModel_Click(object sender, RoutedEventArgs e)
+        {
+            MessageBox.Show("Downloading AMP Model...");
+            // Add your AMP Model download logic here
+        }
+
 
         // Handler for CalculateButton_Click (this is likely where you'll add functionality later)
         private void CalculateButton_Click(object sender, RoutedEventArgs e)
@@ -260,5 +436,18 @@ namespace CoolMangoes
         {
             MessageBox.Show("Cost Model download functionality is under development.");
         }
+
+        private void FlatButton_Click(object sender, RoutedEventArgs e)
+        {
+            FlatButton.Style = (Style)FindResource("SelectedCorrectiveButtonStyle");
+            ConditionButton.Style = (Style)FindResource("ActionButtonStyle");
+        }
+
+        private void ConditionButton_Click(object sender, RoutedEventArgs e)
+        {
+            ConditionButton.Style = (Style)FindResource("SelectedCorrectiveButtonStyle");
+            FlatButton.Style = (Style)FindResource("ActionButtonStyle");
+        }
     }
+    
 }

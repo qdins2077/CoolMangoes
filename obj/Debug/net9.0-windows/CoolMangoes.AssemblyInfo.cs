@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("CoolMangoes")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+3db77c57ba293406fa381cfe95017fec52ed2d8d")]
 [assembly: System.Reflection.AssemblyProductAttribute("CoolMangoes")]
 [assembly: System.Reflection.AssemblyTitleAttribute("CoolMangoes")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

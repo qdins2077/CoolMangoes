@@ -51,12 +51,13 @@ namespace CoolMangoes.Models
 
 
     public class Expenditure
-    {
-        public int Asset_ID { get; set; }
-        public string AssetDescription { get; set; } = string.Empty;
-        public string HierarchyCode { get; set; } = string.Empty;
-        public DateTime ExpenditureDate { get; set; }
-        public double ExpenditureValue { get; set; }
-        public string ExpenditureType { get; set; } = string.Empty; // Ensure it's not nullable
-    }
+{
+    public string Asset_ID { get; set; }  // Make sure this is a string, not an int
+    public string AssetDescription { get; set; }
+    public string HierarchyCode { get; set; }
+    public DateTime ExpenditureDate { get; set; }
+    public double ExpenditureValue { get; set; }
+    public string ExpenditureType { get; set; }
+}
+
 }

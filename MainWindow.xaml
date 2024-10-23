@@ -9,10 +9,10 @@
         <Style x:Key="ActionButtonStyle" TargetType="Button">
             <Setter Property="Background" Value="#4ECDC4"/>
             <Setter Property="Foreground" Value="White"/>
-            <Setter Property="Padding" Value="15,10"/> <!-- Increased Padding -->
-            <Setter Property="Margin" Value="15,15"/> <!-- Increased Margin -->
+            <Setter Property="Padding" Value="10,7"/>
+            <Setter Property="Margin" Value="10,10"/>
             <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="FontSize" Value="18"/>
+            <Setter Property="FontSize" Value="20"/> 
             <Setter Property="BorderBrush" Value="Transparent"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
@@ -26,33 +26,25 @@
             </Setter>
         </Style>
 
-        <!-- Style for Selected Page Button (with larger Shadow) -->
-        <Style x:Key="SelectedActionButtonStyle" TargetType="Button" BasedOn="{StaticResource ActionButtonStyle}">
-            <Setter Property="Effect">
-                <Setter.Value>
-                    <DropShadowEffect Color="Black" BlurRadius="25" ShadowDepth="3" Opacity="0.6"/>
-                </Setter.Value>
-            </Setter>
-            <Setter Property="Background" Value="#FF6B6B"/>  <!-- Red Highlight for the selected button -->
+        <!-- Selected Corrective Button Style -->
+        <Style x:Key="SelectedCorrectiveButtonStyle" TargetType="Button" BasedOn="{StaticResource ActionButtonStyle}">
+            <Setter Property="Background" Value="#FF6B6B"/>
         </Style>
 
-        <!-- Style for Red Button with Download Icon -->
-        <Style x:Key="RedActionButtonStyle" TargetType="Button" BasedOn="{StaticResource ActionButtonStyle}">
-            <Setter Property="Background" Value="#FF6B6B"/>  <!-- Red Button -->
+        <!-- Selected Menu Button Style -->
+        <Style x:Key="SelectedActionButtonStyle" TargetType="Button" BasedOn="{StaticResource ActionButtonStyle}">
+            <Setter Property="Background" Value="#FF6B6B"/>
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect Color="Black" ShadowDepth="3" Opacity="0.5"/>
+                </Setter.Value>
+            </Setter>
         </Style>
     </Window.Resources>
 
-    <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>  <!-- Header Row -->
-            <RowDefinition Height="Auto"/>  <!-- Navigation Menu Row -->
-            <RowDefinition Height="Auto"/>  <!-- Note Section -->
-            <RowDefinition Height="*"/>     <!-- Main Content (Downloads/Uploads) -->
-            <RowDefinition Height="Auto"/>  <!-- Calculation and Footer Section -->
-        </Grid.RowDefinitions>
-
+    <StackPanel>
         <!-- Header Section -->
-        <DockPanel Grid.Row="0" LastChildFill="True" Background="#FF6B6B" Height="70">
+        <DockPanel LastChildFill="True" Background="#FF6B6B" Height="70">
             <TextBlock Text="Cool Mangoes" FontSize="36" FontWeight="Bold" Foreground="White" VerticalAlignment="Center" HorizontalAlignment="Center"/>
         </DockPanel>
 
@@ -64,7 +56,7 @@
                 <!-- LCC Model (Placeholder for future window) -->
                 <Button Content="LCC Model" Style="{StaticResource ActionButtonStyle}" Width="120" Click="ShowLCCSection"/>
                 <!-- Maintenance Model (Placeholder for future window) -->
-                <Button Content="Maintenance Model" Style="{StaticResource ActionButtonStyle}" Width="170" Click="ShowMaintenanceSection"/>
+                <Button Content="Maintenance Model" Style="{StaticResource ActionButtonStyle}" Width="190" Click="ShowMaintenanceSection"/>
             </StackPanel>
         </DockPanel>
 
@@ -75,25 +67,25 @@
             </Border>
         </StackPanel>
 
-        <!-- Main Content: Downloads and Uploads -->
-        <Grid Grid.Row="3" Margin="0,20,0,20" HorizontalAlignment="Center">
+        <!-- Download and Upload Templates in Two Columns -->
+        <Grid HorizontalAlignment="Center" VerticalAlignment="Top" Margin="10"> 
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="1.5*"/>
-                <ColumnDefinition Width="1.5*"/>
+                <ColumnDefinition Width="1*" />
+                <ColumnDefinition Width="1*" />
             </Grid.ColumnDefinitions>
 
-            <!-- Downloads Section -->
-            <StackPanel Grid.Column="0" Margin="15">
-                <TextBlock Text="Download Templates" FontSize="24" FontWeight="Bold" Foreground="#FF6B6B" Margin="10,20,10,5"/>
+            <!-- Download Templates Column -->
+            <StackPanel Grid.Column="0" HorizontalAlignment="Center">
+                <TextBlock Text="Download Templates" FontSize="22" FontWeight="Bold" Foreground="#FF6B6B" Margin="10,15,10,5" HorizontalAlignment="Center"/> 
                 <Button Content="1. AssetData" Style="{StaticResource ActionButtonStyle}" Click="DownloadAssetData_Click"/>
                 <Button Content="3. ClassData" Style="{StaticResource ActionButtonStyle}" Click="DownloadClassData_Click"/>
                 <Button Content="5. MaintenanceStrategies" Style="{StaticResource ActionButtonStyle}" Click="DownloadMaintenanceStrategies_Click"/>
                 <Button Content="7. MaintenanceProcedures" Style="{StaticResource ActionButtonStyle}" Click="DownloadMaintenanceProcedures_Click"/>
             </StackPanel>
 
-            <!-- Uploads Section (Centered Title) -->
-            <StackPanel Grid.Column="1" Margin="15">
-                <TextBlock Text="Upload Data" FontSize="24" FontWeight="Bold" Foreground="#FF6B6B" Margin="10,20,10,5" HorizontalAlignment="Center"/>
+            <!-- Upload Templates Column -->
+            <StackPanel Grid.Column="1" HorizontalAlignment="Center">
+                <TextBlock Text="Upload Data" FontSize="22" FontWeight="Bold" Foreground="#FF6B6B" Margin="10,15,10,5" HorizontalAlignment="Center"/> 
                 <Button Content="2. AssetData" Style="{StaticResource ActionButtonStyle}" Click="UploadAssetData_Click"/>
                 <Button Content="4. ClassData" Style="{StaticResource ActionButtonStyle}" Click="UploadClassData_Click"/>
                 <Button Content="6. MaintenanceStrategies" Style="{StaticResource ActionButtonStyle}" Click="UploadMaintenanceStrategies_Click"/>
@@ -101,33 +93,63 @@
             </StackPanel>
         </Grid>
 
-        <!-- Calculation Section -->
-        <StackPanel Grid.Row="4" VerticalAlignment="Bottom" Margin="20">
-            <TextBlock Text="Corrective Method" FontSize="18" FontWeight="Bold" Margin="10" HorizontalAlignment="Center"/>
-
-            <!-- Radio Button Group for Corrective Method -->
+        <!-- Corrective Method Section -->
+        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Top" Margin="20">
+            <TextBlock Text="Choose Corrective Method" FontSize="20" FontWeight="Bold" Foreground="#FF6B6B" Margin="10" HorizontalAlignment="Center"/> 
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="10">
-                <RadioButton GroupName="CorrectiveMethod" Content="Flat (58% PM)" IsChecked="True" Margin="10"/>
-                <RadioButton GroupName="CorrectiveMethod" Content="Condition Based" Margin="10"/>
-            </StackPanel>
-
-            <!-- Calculate and Download Cost Model Buttons with Red Download Button -->
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="20">
-                <Button Content="Calculate" Style="{StaticResource ActionButtonStyle}" Click="CalculateButton_Click"/>
-                <Button Style="{StaticResource RedActionButtonStyle}" Click="DownloadCostModelButton_Click">
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                <!-- Text for the button -->
-                <TextBlock Text="Cost Model" VerticalAlignment="Center"/>
-                <!-- Download icon next to the text -->
-                <Image Source="/Resources/download-icon.png" Width="16" Height="16" Margin="5,0,0,0" VerticalAlignment="Center"/>
-            </StackPanel>
-        </Button>
+                <Button Content="Flat (58% PM)" Name="FlatButton" Style="{StaticResource ActionButtonStyle}" Width="150" Click="FlatButton_Click"/>
+                <Button Content="Condition Based" Name="ConditionButton" Style="{StaticResource ActionButtonStyle}" Width="150" Click="ConditionButton_Click"/>
             </StackPanel>
         </StackPanel>
 
-        <!-- Status Messages and Calculation State -->
-        <StackPanel Name="CalculationStatusPanel" Visibility="Collapsed" Margin="20" VerticalAlignment="Center">
-            <TextBlock Text="Calculating... Please wait." FontSize="18" FontWeight="Bold" Foreground="DarkRed" HorizontalAlignment="Center"/>
+        <!-- Project Start and End Dates Section -->
+        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Top" Margin="20"> 
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="1*" />
+                    <ColumnDefinition Width="1*" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Project Start Date -->
+                <StackPanel Grid.Column="0" HorizontalAlignment="Center" Margin="5"> 
+                    <TextBlock Text="Project Start Date" FontSize="18" FontWeight="Bold" Foreground="#FF6B6B" HorizontalAlignment="Center" Margin="10"/> 
+                    <DatePicker Margin="10" Width="200" Name="StartDatePicker" SelectedDateChanged="ProjectStartDate_SelectedDateChanged"/>
+                </StackPanel>
+
+                <!-- Project End Date -->
+                <StackPanel Grid.Column="1" HorizontalAlignment="Center" Margin="5"> 
+                    <TextBlock Text="Project End Date" FontSize="18" FontWeight="Bold" Foreground="#FF6B6B" HorizontalAlignment="Center" Margin="10"/> 
+                    <DatePicker Margin="10" Width="200" Name="EndDatePicker" SelectedDateChanged="ProjectEndDate_SelectedDateChanged"/>
+                </StackPanel>
+            </Grid>
         </StackPanel>
-    </Grid>
+
+        <!-- LCC and AMP Models Section -->
+        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Top" Margin="20"> 
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="1*" />
+                    <ColumnDefinition Width="1*" />
+                </Grid.ColumnDefinitions>
+
+                <!-- LCC Model -->
+                <StackPanel Grid.Column="0" HorizontalAlignment="Center" Margin="5"> 
+                    <TextBlock Text="1. LCC Model" FontSize="18" FontWeight="Bold" Foreground="#FF6B6B" HorizontalAlignment="Center" Margin="10"/> 
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="10">
+                        <Button Content="Calculate" Style="{StaticResource ActionButtonStyle}" Width="120" Click="CalculateLCCModel_Click"/>
+                        <Button Content="Download" Style="{StaticResource ActionButtonStyle}" Width="120" Background="#FF6B6B" Click="DownloadLCCModel_Click"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- AMP Model -->
+                <StackPanel Grid.Column="1" HorizontalAlignment="Center" Margin="5"> 
+                    <TextBlock Text="2. AMP Model" FontSize="18" FontWeight="Bold" Foreground="#FF6B6B" HorizontalAlignment="Center" Margin="10"/> 
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="10">
+                        <Button Content="Calculate" Style="{StaticResource ActionButtonStyle}" Width="120" Click="CalculateAMPModel_Click"/>
+                        <Button Content="Download" Style="{StaticResource ActionButtonStyle}" Width="120" Background="#FF6B6B" Click="DownloadAMPModel_Click"/>
+                    </StackPanel>
+                </StackPanel>
+            </Grid>
+        </StackPanel>
+    </StackPanel>
 </Window>

@@ -26,7 +26,7 @@ public class AssetDataService
         using (var csvReader = new CsvReader(reader, config))
         {
             csvReader.Context.TypeConverterCache.AddConverter<DateTime?>(new NullableDateTimeConverter());
-            //csvReader.Context.TypeConverterCache.AddConverter<decimal?>(new NullableDecimalConverter());
+            csvReader.Context.TypeConverterCache.AddConverter<decimal?>(new NullableDecimalConverter());
 
             // Register AssetMap
             csvReader.Context.RegisterClassMap<AssetMap>();

@@ -32,3 +32,4 @@ C:\Users\RobP\Desktop\lcc bananas\LCC Bananas\CoolMangoes\bin\Debug\net9.0-windo
 C:\Users\RobP\Desktop\lcc bananas\LCC Bananas\CoolMangoes\bin\Debug\net9.0-windows\Microsoft.Extensions.FileSystemGlobbing.dll
 C:\Users\RobP\Desktop\lcc bananas\LCC Bananas\CoolMangoes\bin\Debug\net9.0-windows\Microsoft.Extensions.Primitives.dll
 C:\Users\RobP\Desktop\lcc bananas\LCC Bananas\CoolMangoes\bin\Debug\net9.0-windows\Microsoft.IO.RecyclableMemoryStream.dll
+C:\Users\RobP\Desktop\lcc bananas\LCC Bananas\CoolMangoes\obj\Debug\net9.0-windows\CoolMangoes.sourcelink.json
