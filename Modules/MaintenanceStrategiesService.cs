@@ -10,59 +10,39 @@ namespace CoolMangoes.Modules
 {
     public class MaintenanceStrategiesService
     {
-        private List<MaintenanceStrategy> strategiesList = new List<MaintenanceStrategy>();
-
         // Generate the MaintenanceStrategies data from ClassData
         public List<MaintenanceStrategy> GenerateMaintenanceStrategies(List<ClassData> classDataList)
         {
-            var maintenanceStrategies = new List<MaintenanceStrategy>();
-
-            // Filter and map the relevant ClassData where MaintenanceType = "Planned"
-            var filteredData = classDataList
+            var maintenanceStrategies = classDataList
                 .Where(c => c.MaintenanceType == "Planned")
-                .OrderBy(c => c.HierarchyCode) // Sort the HierarchyCode
-                .ToList();
-
-            foreach (var classData in filteredData)
-            {
-                var strategy = new MaintenanceStrategy
+                .OrderBy(c => c.HierarchyCode)
+                .Select(classData => new MaintenanceStrategy
                 {
                     StrategyCode = classData.HierarchyCode,
                     StrategyDescription = classData.AssetType,
-                    CostPerHour = 0,  // Assuming default cost value, can be filled later
-                    ResourceType = string.Empty,  // Default empty value, can be updated
-                    ResourceName = string.Empty   // Default empty value, can be updated
-                };
+                    CostPerHour = 0, // Default value, can be updated
+                    ResourceType = string.Empty,
+                    ResourceName = string.Empty
+                })
+                .ToList();
 
-                maintenanceStrategies.Add(strategy);
-            }
-
-            // Store strategies in the internal list
-            strategiesList = maintenanceStrategies;
             return maintenanceStrategies;
         }
 
         // Method to download the MaintenanceStrategies template
         public void DownloadMaintenanceStrategiesTemplate(List<MaintenanceStrategy> maintenanceStrategies, string filePath)
         {
-            var headers = new List<string>
+            var config = new CsvConfiguration(CultureInfo.InvariantCulture)
             {
-                "StrategyCode", "StrategyDescription", "Cost/hour", "ResourceType", "ResourceName"
+                HasHeaderRecord = true,
+                IgnoreBlankLines = true
             };
 
             using (var writer = new StreamWriter(filePath))
-            using (var csvWriter = new CsvWriter(writer, CultureInfo.InvariantCulture))
+            using (var csvWriter = new CsvWriter(writer, config))
             {
-                // Write the headers
-                csvWriter.WriteField(headers);
-                csvWriter.NextRecord();
-
-                // Write each MaintenanceStrategy record
-                foreach (var strategy in maintenanceStrategies)
-                {
-                    csvWriter.WriteRecord(strategy);
-                    csvWriter.NextRecord();
-                }
+                csvWriter.Context.RegisterClassMap<MaintenanceStrategyMap>();
+                csvWriter.WriteRecords(maintenanceStrategies);
             }
         }
 
@@ -71,49 +51,42 @@ namespace CoolMangoes.Modules
         {
             var config = new CsvConfiguration(CultureInfo.InvariantCulture)
             {
-                MissingFieldFound = null,  // Handle missing fields gracefully
-                HeaderValidated = null,    // Disable header validation
-                IgnoreBlankLines = true    // Ignore blank lines
+                MissingFieldFound = null,
+                HeaderValidated = null,
+                BadDataFound = null,
+                IgnoreBlankLines = true,
+                PrepareHeaderForMatch = args => args.Header.Trim(),
             };
 
             using (var reader = new StreamReader(filePath))
             using (var csvReader = new CsvReader(reader, config))
             {
-                // Register class map for MaintenanceStrategy
+                csvReader.Context.TypeConverterCache.AddConverter<float?>(new NullableFloatConverter());
+
                 csvReader.Context.RegisterClassMap<MaintenanceStrategyMap>();
-                strategiesList = csvReader.GetRecords<MaintenanceStrategy>().ToList();
+
+                try
+                {
+                    var strategiesList = csvReader.GetRecords<MaintenanceStrategy>().ToList();
+                    return strategiesList;
+                }
+                catch (Exception ex)
+                {
+                    throw new Exception($"Error reading maintenance strategies: {ex.Message}", ex);
+                }
             }
-
-            return strategiesList;
-        }
-
-        // Method to get the current MaintenanceStrategiesList
-        public List<MaintenanceStrategy> GetMaintenanceStrategiesList()
-        {
-            return strategiesList;
         }
     }
 
-    // MaintenanceStrategy class model
-    public class MaintenanceStrategy
-    {
-        public string StrategyCode { get; set; } = string.Empty;
-        public string StrategyDescription { get; set; } = string.Empty;
-        public float CostPerHour { get; set; }
-        public string ResourceType { get; set; } = string.Empty;
-        public string ResourceName { get; set; } = string.Empty;
-    }
-
-    // Class map for the MaintenanceStrategy CSV file structure
     public class MaintenanceStrategyMap : ClassMap<MaintenanceStrategy>
     {
         public MaintenanceStrategyMap()
         {
             Map(m => m.StrategyCode);
             Map(m => m.StrategyDescription);
-            Map(m => m.CostPerHour);
-            Map(m => m.ResourceType);
-            Map(m => m.ResourceName);
+            Map(m => m.CostPerHour).TypeConverter<NullableFloatConverter>().Optional();
+            Map(m => m.ResourceType).Optional();
+            Map(m => m.ResourceName).Optional();
         }
     }
 }

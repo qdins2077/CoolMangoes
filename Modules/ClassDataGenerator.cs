@@ -1,109 +1,54 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
+using CoolMangoes.Models;
 using CsvHelper;
-using CoolMangoes.Modules;
-using CoolMangoes.Models; // Ensure you're using the correct ClassData from Models
+using CsvHelper.Configuration;
+using System.Globalization;
+using System.IO;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace CoolMangoes.Modules
 {
     public class ClassDataGenerator
     {
-        public static List<ClassData> GenerateClassDataTemplate(List<Asset> assetData)
+        public List<ClassData> GenerateClassDataTemplate(List<Asset> assetData)
         {
-            var classMap = new Dictionary<string, ClassData>();
-            var purchaseCosts = new Dictionary<string, List<double>>();
-
-            // Iterate over each asset in assetData
-            foreach (var asset in assetData)
-            {
-                var key = asset.HierarchyCode?.Trim();
-                if (string.IsNullOrEmpty(key)) continue;
-
-                // Initialize ClassData entry if the HierarchyCode doesn't already exist
-                if (!classMap.ContainsKey(key))
+            var classDataList = assetData
+                .GroupBy(a => a.HierarchyCode)
+                .Select(g => new ClassData
                 {
-                    classMap[key] = new ClassData
-                    {
-                        AssetHierarchy = asset.AssetHierarchy ?? string.Empty,
-                        HierarchyCode = key,
-                        AssetType = GetAssetType(asset),
-                        MaintenanceType = asset.MaintenanceType ?? string.Empty,
-                        Statutory = asset.Statutory,  // Assuming it's a map, if not leave it as null
-                        EstimatedLife = null,  // Leave empty as requested
-                        RefurbishmentFrequency = null,  // Leave empty as requested
-                        RefurbishmentCostAsProportionOfReplacementCost = null  // Leave empty as requested
-                    };
-                }
+                    AssetHierarchy = g.FirstOrDefault()?.AssetHierarchy,
+                    HierarchyCode = g.Key,
+                    AssetType = null, // Set default or null values
+                    MaintenanceType = null,
+                    Statutory = null,
+                    EstimatedLife = null,
+                    RefurbishmentFrequency = null,
+                    RefurbishmentCostAsProportionOfReplacementCost = null,
+                    MinCost = null,
+                    MaxCost = null,
+                    AvgReplacementCost = null
+                })
+                .ToList();
 
-                // Collect PurchaseCost data for later processing (min/max/avg)
-                if (asset.PurchaseCost.HasValue)
-                {
-                    if (!purchaseCosts.ContainsKey(key))
-                    {
-                        purchaseCosts[key] = new List<double>();
-                    }
-                    purchaseCosts[key].Add(asset.PurchaseCost.Value);
-                }
-            }
-
-            // Now compute the MinCost, MaxCost, and AvgReplacementCost for each HierarchyCode
-            foreach (var entry in purchaseCosts)
-            {
-                var key = entry.Key;
-                var costs = entry.Value;
-
-                if (costs.Count > 0)
-                {
-                    // Explicitly cast from double to float for MinCost, MaxCost, and AvgReplacementCost
-                    classMap[key].MinCost = (float?)costs.Min();
-                    classMap[key].MaxCost = (float?)costs.Max();
-
-                    // If there's only one cost, use it as the AvgReplacementCost
-                    if (costs.Count == 1)
-                    {
-                        classMap[key].AvgReplacementCost = (float?)costs[0];
-                    }
-                    else
-                    {
-                        // Average the Min and Max
-                        classMap[key].AvgReplacementCost = (float?)((classMap[key].MinCost + classMap[key].MaxCost) / 2);
-                    }
-                }
-            }
-
-            // Return the sorted classData list
-            var classData = classMap.Values.OrderBy(c => c.AssetHierarchy).ToList();
-            return classData;
+            return classDataList;
         }
 
-        private static string GetAssetType(Asset asset)
+        public void DownloadClassDataTemplate(List<ClassData> classDataList, string filePath)
         {
-            return asset.AssetHierarchy?.Split('\\').LastOrDefault() ?? string.Empty;
-        }
-
-        public static void DownloadClassDataTemplate(List<ClassData> classData, string downloadPath)
-        {
-            var headers = new List<string>
+            var config = new CsvConfiguration(CultureInfo.InvariantCulture)
             {
-                "AssetHierarchy", "HierarchyCode", "AssetType", "MaintenanceType", "Statutory",
-                "EstimatedLife", "RefurbishmentFrequency", "RefurbishmentCostAsProportionOfReplacementCost",
-                "MinCost", "MaxCost", "AvgReplacementCost"
+                HasHeaderRecord = true,
+                IgnoreBlankLines = true
             };
 
-            using (var writer = new StreamWriter(downloadPath))
-            using (var csvWriter = new CsvWriter(writer, System.Globalization.CultureInfo.InvariantCulture))
+            using (var writer = new StreamWriter(filePath))
+            using (var csvWriter = new CsvWriter(writer, config))
             {
-                csvWriter.WriteField(headers);
-                csvWriter.NextRecord();
-
-                foreach (var row in classData)
-                {
-                    csvWriter.WriteRecord(row);
-                    csvWriter.NextRecord();
-                }
+                csvWriter.Context.RegisterClassMap<ClassDataMap>();
+                csvWriter.WriteRecords(classDataList);
             }
         }
     }
+
+    
 }

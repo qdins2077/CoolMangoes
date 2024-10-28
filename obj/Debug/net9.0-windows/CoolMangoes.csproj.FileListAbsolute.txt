@@ -33,3 +33,10 @@ C:\Users\RobP\Desktop\lcc bananas\LCC Bananas\CoolMangoes\bin\Debug\net9.0-windo
 C:\Users\RobP\Desktop\lcc bananas\LCC Bananas\CoolMangoes\bin\Debug\net9.0-windows\Microsoft.Extensions.Primitives.dll
 C:\Users\RobP\Desktop\lcc bananas\LCC Bananas\CoolMangoes\bin\Debug\net9.0-windows\Microsoft.IO.RecyclableMemoryStream.dll
 C:\Users\RobP\Desktop\lcc bananas\LCC Bananas\CoolMangoes\obj\Debug\net9.0-windows\CoolMangoes.sourcelink.json
+C:\Users\RobP\Desktop\lcc bananas\LCC Bananas\CoolMangoes\bin\Debug\net9.0-windows\ClosedXML.dll
+C:\Users\RobP\Desktop\lcc bananas\LCC Bananas\CoolMangoes\bin\Debug\net9.0-windows\ClosedXML.Parser.dll
+C:\Users\RobP\Desktop\lcc bananas\LCC Bananas\CoolMangoes\bin\Debug\net9.0-windows\DocumentFormat.OpenXml.dll
+C:\Users\RobP\Desktop\lcc bananas\LCC Bananas\CoolMangoes\bin\Debug\net9.0-windows\DocumentFormat.OpenXml.Framework.dll
+C:\Users\RobP\Desktop\lcc bananas\LCC Bananas\CoolMangoes\bin\Debug\net9.0-windows\ExcelNumberFormat.dll
+C:\Users\RobP\Desktop\lcc bananas\LCC Bananas\CoolMangoes\bin\Debug\net9.0-windows\RBush.dll
+C:\Users\RobP\Desktop\lcc bananas\LCC Bananas\CoolMangoes\bin\Debug\net9.0-windows\SixLabors.Fonts.dll

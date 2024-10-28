@@ -15,10 +15,9 @@ namespace CoolMangoes.Modules
         {
             var procedures = new List<MaintenanceProcedure>();
 
-            // Match StrategyCode from strategies to HierarchyCode from assets and create MaintenanceProcedures
             foreach (var strategy in strategies)
             {
-                var matchingAssets = assets.Where(a => a.HierarchyCode == strategy.StrategyCode).DistinctBy(a => a.HierarchyCode).ToList();
+                var matchingAssets = assets.Where(a => a.HierarchyCode == strategy.StrategyCode).ToList();
 
                 foreach (var asset in matchingAssets)
                 {
@@ -30,14 +29,14 @@ namespace CoolMangoes.Modules
                         HierarchyL2 = asset.HierarchyL2,
                         HierarchyL3 = asset.HierarchyL3,
                         HierarchyL4 = asset.HierarchyL4,
-                        ProcedureCode = string.Empty,  // Empty by default, can be filled later
-                        ProcedureDescription = string.Empty,  // Empty by default, can be filled later
-                        Duration = null,  // Empty by default, can be filled later
-                        Frequency = null,  // Empty by default, can be filled later
-                        FrequencyType = string.Empty,  // Empty by default, can be filled later
-                        MaintenanceStatus = string.Empty,  // Empty by default, can be filled later
+                        ProcedureCode = string.Empty,
+                        ProcedureDescription = string.Empty,
+                        Duration = null,
+                        Frequency = null,
+                        FrequencyType = string.Empty,
+                        MaintenanceStatus = string.Empty,
                         Statutory = asset.Statutory,
-                        LastDoneDate = null  // Empty by default, can be filled later
+                        LastDoneDate = null
                     };
 
                     procedures.Add(procedure);
@@ -50,91 +49,71 @@ namespace CoolMangoes.Modules
         // Method to download MaintenanceProcedures template to a CSV file
         public void DownloadMaintenanceProceduresTemplate(List<MaintenanceProcedure> procedures, string filePath)
         {
-            var headers = new List<string>
+            var config = new CsvConfiguration(CultureInfo.InvariantCulture)
             {
-                "StrategyCode", "StrategyDescription", "HierarchyL1", "HierarchyL2", "HierarchyL3", "HierarchyL4",
-                "ProcedureCode", "ProcedureDescription", "Duration", "Frequency", "FrequencyType", "MaintenanceStatus", 
-                "Statutory", "LastDoneDate"
+                HasHeaderRecord = true,
+                IgnoreBlankLines = true
             };
 
             using (var writer = new StreamWriter(filePath))
-            using (var csvWriter = new CsvWriter(writer, CultureInfo.InvariantCulture))
+            using (var csvWriter = new CsvWriter(writer, config))
             {
-                // Write headers
-                csvWriter.WriteField(headers);
-                csvWriter.NextRecord();
-
-                // Write each MaintenanceProcedure record
-                foreach (var procedure in procedures)
-                {
-                    csvWriter.WriteRecord(procedure);
-                    csvWriter.NextRecord();
-                }
+                csvWriter.Context.RegisterClassMap<MaintenanceProcedureMap>();
+                csvWriter.WriteRecords(procedures);
             }
         }
 
         // Method to upload and parse MaintenanceProcedures from a CSV file
         public List<MaintenanceProcedure> LoadMaintenanceProcedures(string filePath)
         {
-            var proceduresList = new List<MaintenanceProcedure>();
-
             var config = new CsvConfiguration(CultureInfo.InvariantCulture)
             {
-                MissingFieldFound = null,  // Handle missing fields gracefully
-                HeaderValidated = null,    // Disable header validation
-                IgnoreBlankLines = true    // Ignore blank lines
+                MissingFieldFound = null,
+                HeaderValidated = null,
+                BadDataFound = null,
+                IgnoreBlankLines = true,
+                PrepareHeaderForMatch = args => args.Header.Trim(),
             };
 
             using (var reader = new StreamReader(filePath))
             using (var csvReader = new CsvReader(reader, config))
             {
-                // Register class map for MaintenanceProcedure
-                csvReader.Context.RegisterClassMap<MaintenanceProcedureMap>();
-                proceduresList = csvReader.GetRecords<MaintenanceProcedure>().ToList();
-            }
+                csvReader.Context.TypeConverterCache.AddConverter<DateTime?>(new NullableDateTimeConverter());
+                csvReader.Context.TypeConverterCache.AddConverter<float?>(new NullableFloatConverter());
 
-            return proceduresList;
+                csvReader.Context.RegisterClassMap<MaintenanceProcedureMap>();
+
+                try
+                {
+                    var proceduresList = csvReader.GetRecords<MaintenanceProcedure>().ToList();
+                    return proceduresList;
+                }
+                catch (Exception ex)
+                {
+                    throw new Exception($"Error reading maintenance procedures: {ex.Message}", ex);
+                }
+            }
         }
     }
 
-    // MaintenanceProcedure class model
-    public class MaintenanceProcedure
-    {
-        public string StrategyCode { get; set; } = string.Empty;
-        public string StrategyDescription { get; set; } = string.Empty;
-        public string? HierarchyL1 { get; set; }
-        public string? HierarchyL2 { get; set; }
-        public string? HierarchyL3 { get; set; }
-        public string? HierarchyL4 { get; set; }
-        public string ProcedureCode { get; set; } = string.Empty;
-        public string ProcedureDescription { get; set; } = string.Empty;
-        public float? Duration { get; set; }
-        public float? Frequency { get; set; }
-        public string FrequencyType { get; set; } = string.Empty;
-        public string MaintenanceStatus { get; set; } = string.Empty;
-        public string? Statutory { get; set; }
-        public DateTime? LastDoneDate { get; set; }
-    }
-
-    // Class map for the MaintenanceProcedure CSV file structure
     public class MaintenanceProcedureMap : ClassMap<MaintenanceProcedure>
     {
         public MaintenanceProcedureMap()
         {
             Map(m => m.StrategyCode);
             Map(m => m.StrategyDescription);
-            Map(m => m.HierarchyL1);
-            Map(m => m.HierarchyL2);
-            Map(m => m.HierarchyL3);
-            Map(m => m.HierarchyL4);
+            Map(m => m.HierarchyL1).Optional();
+            Map(m => m.HierarchyL2).Optional();
+            Map(m => m.HierarchyL3).Optional();
+            Map(m => m.HierarchyL4).Optional();
             Map(m => m.ProcedureCode);
             Map(m => m.ProcedureDescription);
-            Map(m => m.Duration);
-            Map(m => m.Frequency);
+            Map(m => m.Duration).TypeConverter<NullableFloatConverter>().Optional();
+            Map(m => m.Frequency).TypeConverter<NullableFloatConverter>().Optional();
             Map(m => m.FrequencyType);
             Map(m => m.MaintenanceStatus);
-            Map(m => m.Statutory);
-            Map(m => m.LastDoneDate);
+            Map(m => m.Statutory).Optional();
+            Map(m => m.LastDoneDate).TypeConverter<NullableDateTimeConverter>().Optional();
         }
     }
 }

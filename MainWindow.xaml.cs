@@ -2,12 +2,13 @@
 using System;
 using System.IO;
 using System.Windows;
-using System.Windows.Controls; // Add this line to resolve DatePicker errors
 using System.Collections.Generic;
 using System.Linq;
-using System.Collections.Generic;
+using System.Threading.Tasks;
 using CoolMangoes.Modules;
-using CoolMangoes.Models;  // For using Asset and ClassData classes
+using CoolMangoes.Models;
+using System.Windows.Threading;
+using System.Windows.Controls;
 
 namespace CoolMangoes
 {
@@ -19,15 +20,17 @@ namespace CoolMangoes
         private readonly MaintenanceStrategiesService maintenanceStrategiesService;
         private readonly MaintenanceProceduresService maintenanceProceduresService;
 
-        // Hold the uploaded asset and class data in memory after it's uploaded
         private List<Asset> uploadedAssetDataList;
         private List<ClassData> uploadedClassDataList;
-
+        private List<MaintenanceProcedure> uploadedMaintenanceProceduresList;
+        private List<MaintenanceStrategy> uploadedMaintenanceStrategiesList;
         public DateTime? ProjectStartDate { get; set; }
         public DateTime? ProjectEndDate { get; set; }
-        // private List<Expenditure> calculatedExpenditurePlan;
-        private List<MaintenanceProcedure> uploadedMaintenanceProceduresList;
+        private List<CapitalProject> uploadedCapitalProjectsList;
+        private readonly CapitalProjectService capitalProjectService;
 
+        private bool _isFlatModeSelected = false;
+        
 
         public MainWindow()
         {
@@ -37,6 +40,7 @@ namespace CoolMangoes
             classDataService = new ClassDataService();
             maintenanceStrategiesService = new MaintenanceStrategiesService();
             maintenanceProceduresService = new MaintenanceProceduresService();
+            capitalProjectService = new CapitalProjectService();
         }
 
         private void ShowDataSection(object sender, RoutedEventArgs e)
@@ -59,17 +63,16 @@ namespace CoolMangoes
         {
             try
             {
-                string downloadsFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
-                string saveFilePath = Path.Combine(downloadsFolder, "AssetDataTemplate.csv");
-
                 downloadService.DownloadAssetDataTemplate();
-                MessageBox.Show($"AssetData template has been downloaded to {saveFilePath}");
+                MessageBox.Show("AssetData template has been downloaded to your Downloads folder.");
             }
             catch (Exception ex)
             {
                 MessageBox.Show($"An error occurred during the download: {ex.Message}");
             }
         }
+
+        // Uploads AssetData from a CSV file
         private void UploadAssetData_Click(object sender, RoutedEventArgs e)
         {
             OpenFileDialog openFileDialog = new OpenFileDialog
@@ -82,7 +85,7 @@ namespace CoolMangoes
                 try
                 {
                     string filePath = openFileDialog.FileName;
-                    uploadedAssetDataList = assetDataService.LoadAssetData(filePath);  // Store the uploaded data
+                    uploadedAssetDataList = assetDataService.LoadAssetData(filePath);
 
                     if (uploadedAssetDataList == null || uploadedAssetDataList.Count == 0)
                     {
@@ -90,23 +93,21 @@ namespace CoolMangoes
                     }
                     else
                     {
-                        MessageBox.Show($"File processed successfully. Total records: {uploadedAssetDataList.Count}");
+                        MessageBox.Show($"Asset Data loaded successfully. Total records: {uploadedAssetDataList.Count}");
                     }
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"An error occurred during file upload: {ex.Message}");
+                    MessageBox.Show($"An error occurred during Asset Data upload: {ex.Message}");
                 }
             }
         }
-
 
         // Downloads ClassData template based on processed AssetData and saves to Downloads folder
         private void DownloadClassData_Click(object sender, RoutedEventArgs e)
         {
             try
             {
-                // Check if AssetData was uploaded first
                 if (uploadedAssetDataList == null || uploadedAssetDataList.Count == 0)
                 {
                     MessageBox.Show("Please upload AssetData first.");
@@ -114,13 +115,14 @@ namespace CoolMangoes
                 }
 
                 // Generate ClassDataTemplate
-                var classDataList = ClassDataGenerator.GenerateClassDataTemplate(uploadedAssetDataList);
+                var classDataGenerator = new ClassDataGenerator();
+                var classDataList = classDataGenerator.GenerateClassDataTemplate(uploadedAssetDataList);
 
                 // Save ClassDataTemplate to the Downloads folder
                 string downloadsFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
                 string saveFilePath = Path.Combine(downloadsFolder, "ClassDataTemplate.csv");
 
-                ClassDataGenerator.DownloadClassDataTemplate(classDataList, saveFilePath);
+                classDataGenerator.DownloadClassDataTemplate(classDataList, saveFilePath);
                 MessageBox.Show($"ClassData template has been downloaded to {saveFilePath}");
             }
             catch (Exception ex)
@@ -129,88 +131,6 @@ namespace CoolMangoes
             }
         }
 
-        // Downloads MaintenanceStrategies template directly to the Downloads folder
-        private void DownloadMaintenanceStrategies_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                // Assuming ClassData is already loaded previously in the app and is accessible
-                var classDataList = classDataService.GetClassDataList(); // Get the loaded ClassData list
-                
-                if (classDataList == null || classDataList.Count == 0)
-                {
-                    MessageBox.Show("ClassData is empty or not loaded.");
-                    return;
-                }
-
-                // Generate MaintenanceStrategies from ClassData where MaintenanceType = "Planned"
-                var maintenanceStrategies = maintenanceStrategiesService.GenerateMaintenanceStrategies(classDataList);
-
-                // Define the downloads folder
-                string downloadsFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
-                string saveFilePath = Path.Combine(downloadsFolder, "MaintenanceStrategiesTemplate.csv");
-
-                // Download the MaintenanceStrategies template
-                maintenanceStrategiesService.DownloadMaintenanceStrategiesTemplate(maintenanceStrategies, saveFilePath);
-
-                MessageBox.Show($"MaintenanceStrategies template has been downloaded to {saveFilePath}");
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"An error occurred during the download: {ex.Message}");
-            }
-        }
-
-        // Downloads MaintenanceProcedures template directly to the Downloads folder
-        private void DownloadMaintenanceProcedures_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                if (uploadedAssetDataList == null || uploadedClassDataList == null)
-                {
-                    MessageBox.Show("Please upload both AssetData and Maintenance Strategies first.");
-                    return;
-                }
-
-                // Generate MaintenanceProcedures based on uploaded data
-                var strategies = maintenanceStrategiesService.GetMaintenanceStrategiesList();  // Now this works
-                var procedures = maintenanceProceduresService.GenerateMaintenanceProcedures(strategies, uploadedAssetDataList);
-
-                // Save the procedures to the Downloads folder
-                string downloadsFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
-                string saveFilePath = Path.Combine(downloadsFolder, "MaintenanceProceduresTemplate.csv");
-
-                maintenanceProceduresService.DownloadMaintenanceProceduresTemplate(procedures, saveFilePath);
-                MessageBox.Show($"MaintenanceProcedures template has been downloaded to {saveFilePath}");
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"An error occurred during the download: {ex.Message}");
-            }
-        }
-
-        // Uploads AssetData from a CSV file
-        // private void UploadAssetData_Click(object sender, RoutedEventArgs e)
-        // {
-        //     OpenFileDialog openFileDialog = new OpenFileDialog
-        //     {
-        //         Filter = "CSV files (*.csv)|*.csv"
-        //     };
-
-        //     if (openFileDialog.ShowDialog() == true)
-        //     {
-        //         try
-        //         {
-        //             string filePath = openFileDialog.FileName;
-        //             uploadedAssetDataList = assetDataService.LoadAssetData(filePath);  // Store the uploaded data
-        //             MessageBox.Show($"File processed successfully. Total Asset records: {uploadedAssetDataList.Count}");
-        //         }
-        //         catch (Exception ex)
-        //         {
-        //             MessageBox.Show($"An error occurred during file upload: {ex.Message}");
-        //         }
-        //     }
-        // }
 
         // Uploads ClassData from a CSV file
         private void UploadClassData_Click(object sender, RoutedEventArgs e)
@@ -225,17 +145,46 @@ namespace CoolMangoes
                 try
                 {
                     string filePath = openFileDialog.FileName;
-
-                    // Load ClassData using ClassDataService
                     uploadedClassDataList = classDataService.LoadClassData(filePath);
 
-                    // Show the total number of records processed
-                    MessageBox.Show($"File processed successfully. Total Class records: {uploadedClassDataList.Count}");
+                    if (uploadedClassDataList == null || uploadedClassDataList.Count == 0)
+                    {
+                        MessageBox.Show("Failed to load Class Data.");
+                    }
+                    else
+                    {
+                        MessageBox.Show($"Class Data loaded successfully. Total records: {uploadedClassDataList.Count}");
+                    }
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"An error occurred during file upload: {ex.Message}");
+                    MessageBox.Show($"An error occurred during Class Data upload: {ex.Message}");
                 }
+            }
+        }
+
+        // Downloads MaintenanceStrategies template directly to the Downloads folder
+        private void DownloadMaintenanceStrategies_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (uploadedClassDataList == null || uploadedClassDataList.Count == 0)
+                {
+                    MessageBox.Show("Please upload Class Data first.");
+                    return;
+                }
+
+                var maintenanceStrategies = maintenanceStrategiesService.GenerateMaintenanceStrategies(uploadedClassDataList);
+
+                string downloadsFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
+                string saveFilePath = Path.Combine(downloadsFolder, "MaintenanceStrategiesTemplate.csv");
+
+                maintenanceStrategiesService.DownloadMaintenanceStrategiesTemplate(maintenanceStrategies, saveFilePath);
+                MessageBox.Show($"MaintenanceStrategies template has been downloaded to {saveFilePath}");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"An error occurred during Maintenance Strategies download: {ex.Message}");
             }
         }
 
@@ -249,21 +198,53 @@ namespace CoolMangoes
 
             if (openFileDialog.ShowDialog() == true)
             {
-                string filePath = openFileDialog.FileName;
-
                 try
                 {
-                    var strategiesList = maintenanceStrategiesService.LoadMaintenanceStrategies(filePath);
-                    MessageBox.Show($"File processed successfully. Total Maintenance Strategies: {strategiesList.Count}");
+                    string filePath = openFileDialog.FileName;
+                    uploadedMaintenanceStrategiesList = maintenanceStrategiesService.LoadMaintenanceStrategies(filePath);
+
+                    if (uploadedMaintenanceStrategiesList == null || uploadedMaintenanceStrategiesList.Count == 0)
+                    {
+                        MessageBox.Show("Failed to load Maintenance Strategies.");
+                    }
+                    else
+                    {
+                        MessageBox.Show($"Maintenance Strategies loaded successfully. Total records: {uploadedMaintenanceStrategiesList.Count}");
+                    }
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"An error occurred during file upload: {ex.Message}");
+                    MessageBox.Show($"An error occurred during Maintenance Strategies upload: {ex.Message}");
                 }
             }
         }
 
-        // Handler for UploadMaintenanceProcedures_Click (this is likely where you'll add functionality later)
+        // Downloads MaintenanceProcedures template directly to the Downloads folder
+        private void DownloadMaintenanceProcedures_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (uploadedAssetDataList == null || uploadedMaintenanceStrategiesList == null)
+                {
+                    MessageBox.Show("Please upload both Asset Data and Maintenance Strategies first.");
+                    return;
+                }
+
+                var procedures = maintenanceProceduresService.GenerateMaintenanceProcedures(uploadedMaintenanceStrategiesList, uploadedAssetDataList);
+
+                string downloadsFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
+                string saveFilePath = Path.Combine(downloadsFolder, "MaintenanceProceduresTemplate.csv");
+
+                maintenanceProceduresService.DownloadMaintenanceProceduresTemplate(procedures, saveFilePath);
+                MessageBox.Show($"MaintenanceProcedures template has been downloaded to {saveFilePath}");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"An error occurred during Maintenance Procedures download: {ex.Message}");
+            }
+        }
+
+        // Uploads MaintenanceProcedures from a CSV file
         private void UploadMaintenanceProcedures_Click(object sender, RoutedEventArgs e)
         {
             OpenFileDialog openFileDialog = new OpenFileDialog
@@ -273,181 +254,310 @@ namespace CoolMangoes
 
             if (openFileDialog.ShowDialog() == true)
             {
-                string filePath = openFileDialog.FileName;
-
                 try
                 {
-                    // Load Maintenance Procedures using MaintenanceProceduresService
-                    uploadedMaintenanceProceduresList = maintenanceProceduresService.LoadMaintenanceProcedures(filePath);  // Assign to the correct variable
+                    string filePath = openFileDialog.FileName;
+                    uploadedMaintenanceProceduresList = maintenanceProceduresService.LoadMaintenanceProcedures(filePath);
 
                     if (uploadedMaintenanceProceduresList == null || uploadedMaintenanceProceduresList.Count == 0)
                     {
-                        MessageBox.Show("Failed to load Maintenance Procedures data or the list is empty.");
+                        MessageBox.Show("Failed to load Maintenance Procedures.");
                     }
                     else
                     {
-                        MessageBox.Show($"Maintenance Procedures data loaded successfully. Total records: {uploadedMaintenanceProceduresList.Count}");
+                        MessageBox.Show($"Maintenance Procedures loaded successfully. Total records: {uploadedMaintenanceProceduresList.Count}");
                     }
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"An error occurred during Maintenance Procedures file upload: {ex.Message}");
+                    MessageBox.Show($"An error occurred during Maintenance Procedures upload: {ex.Message}");
                 }
             }
         }
 
-
-        // Handler for Flat (58% PM) corrective method
-        private void FlatMethodButton_Click(object sender, RoutedEventArgs e)
-        {
-            MessageBox.Show("Flat (58% PM) method selected.");
-            // You can add logic for handling this method here
-        }
-
-        // Handler for Condition Based corrective method
-        private void ConditionBasedMethodButton_Click(object sender, RoutedEventArgs e)
-        {
-            MessageBox.Show("Condition Based method selected.");
-            // You can add logic for handling this method here
-        }
-
         // Project Start Date Calendar Selection
-        private void ProjectStartDate_SelectedDateChanged(object sender, RoutedEventArgs e)
+        private void ProjectStartDate_SelectedDateChanged(object sender, SelectionChangedEventArgs e)
         {
             if (sender is DatePicker picker && picker.SelectedDate.HasValue)
             {
                 ProjectStartDate = picker.SelectedDate.Value;
-                MessageBox.Show($"Project Start Date: {ProjectStartDate.Value.ToShortDateString()}");
             }
         }
 
         // Project End Date Calendar Selection
-        // Project End Date Calendar Selection
-        private void ProjectEndDate_SelectedDateChanged(object sender, RoutedEventArgs e)
+        private void ProjectEndDate_SelectedDateChanged(object sender, SelectionChangedEventArgs e)
         {
             if (sender is DatePicker picker && picker.SelectedDate.HasValue)
             {
                 ProjectEndDate = picker.SelectedDate.Value;
-                MessageBox.Show($"Project End Date: {ProjectEndDate.Value.ToShortDateString()}");
             }
         }
 
-
         // Handler for LCC Model Calculate Button
-        
-        private void CalculateLCCModel_Click(object sender, RoutedEventArgs e)
+        private async void CalculateLCCModel_Click(object sender, RoutedEventArgs e)
         {
             try
             {
-                // Check if Asset data is loaded
-                if (uploadedAssetDataList == null)
+                if (uploadedAssetDataList == null || uploadedClassDataList == null || uploadedMaintenanceProceduresList == null || uploadedMaintenanceStrategiesList == null)
                 {
-                    MessageBox.Show("Asset data list is null.");
-                    return;
-                }
-                if (uploadedAssetDataList.Count == 0)
-                {
-                    MessageBox.Show("Asset data list is empty.");
+                    MessageBox.Show("Please upload all required data (Asset Data, Class Data, Maintenance Strategies, and Procedures) before calculating.");
                     return;
                 }
 
-                // Check if Class data is loaded
-                if (uploadedClassDataList == null)
-                {
-                    MessageBox.Show("Class data list is null.");
-                    return;
-                }
-                if (uploadedClassDataList.Count == 0)
-                {
-                    MessageBox.Show("Class data list is empty.");
-                    return;
-                }
-
-                // Check if Maintenance Procedures data is loaded
-                if (uploadedMaintenanceProceduresList == null)
-                {
-                    MessageBox.Show("Maintenance Procedures data list is null.");
-                    return;
-                }
-                if (uploadedMaintenanceProceduresList.Count == 0)
-                {
-                    MessageBox.Show("Maintenance Procedures data list is empty.");
-                    return;
-                }
-
-                // Ensure ProjectStartDate and ProjectEndDate are selected
                 if (ProjectStartDate == null || ProjectEndDate == null)
                 {
-                    MessageBox.Show("Please select a Project Start Date and Project End Date.");
+                    MessageBox.Show("Please select both Project Start Date and Project End Date.");
                     return;
                 }
 
-                // Pass the selected project start and end dates into the service
-                var expenditurePlanService = new ExpenditurePlanService(
-                    uploadedAssetDataList, 
-                    uploadedClassDataList, 
-                    uploadedMaintenanceProceduresList, 
-                    ProjectStartDate.Value, 
-                    ProjectEndDate.Value);
+                ProgressBar.Value = 0;
+                StatusText.Text = "Starting calculation...";
 
-                var expenditurePlans = expenditurePlanService.GenerateExpenditurePlan();
+                var progress = new Progress<int>(percent =>
+                {
+                    ProgressBar.Value = percent;
+                    StatusText.Text = $"Progress: {percent}%";
+                });
 
-                // Handle the calculated expenditure plans (store, display, etc.)
-                MessageBox.Show("Calculation completed successfully!");
+                await Task.Run(() =>
+                {
+                    var expenditurePlanService = new ExpenditurePlanService(
+                        uploadedAssetDataList,
+                        uploadedClassDataList,
+                        uploadedMaintenanceProceduresList,
+                        uploadedMaintenanceStrategiesList, // Pass the maintenance strategies list here
+                        ProjectStartDate.Value,
+                        ProjectEndDate.Value,
+                        uploadedCapitalProjectsList
+                    );
+
+                    var expenditurePlans = expenditurePlanService.GenerateExpenditurePlan();
+
+                    string downloadsFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
+                    string filePath = Path.Combine(downloadsFolder, "LCC_CostModel.xlsx");
+
+                    downloadService.DownloadLCCCostModel(expenditurePlans, filePath, progress);
+                });
+
+                MessageBox.Show("Calculation completed!");
+                StatusText.Text = "Calculation completed!";
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"An error occurred: {ex.Message}");
+                MessageBox.Show($"An error occurred during LCC Model calculation: {ex.Message}");
+                StatusText.Text = "Error occurred!";
             }
         }
 
-
-
         // Handler for LCC Model Download Button
-        private void DownloadLCCModel_Click(object sender, RoutedEventArgs e)
+        private async void DownloadLCCModel_Click(object sender, RoutedEventArgs e)
         {
-            
+            try
+            {
+                if (uploadedAssetDataList == null || uploadedAssetDataList.Count == 0)
+                {
+                    MessageBox.Show("No data available for download.");
+                    return;
+                }
+
+                if (ProjectStartDate == null || ProjectEndDate == null)
+                {
+                    MessageBox.Show("Please select both Project Start Date and Project End Date.");
+                    return;
+                }
+
+                ProgressBar.Value = 0;
+                StatusText.Text = "Starting download...";
+
+                var progress = new Progress<int>(percent =>
+                {
+                    ProgressBar.Value = percent;
+                    StatusText.Text = $"Progress: {percent}%";
+                });
+
+                await Task.Run(() =>
+                {
+                    var expenditurePlanService = new ExpenditurePlanService(
+                        uploadedAssetDataList, 
+                        uploadedClassDataList, 
+                        uploadedMaintenanceProceduresList, 
+                        uploadedMaintenanceStrategiesList,
+                        ProjectStartDate.Value, 
+                        ProjectEndDate.Value,
+                        uploadedCapitalProjectsList,
+                        _isFlatModeSelected
+                    );
+
+                    var expenditureData = expenditurePlanService.GenerateExpenditurePlan();
+
+                    string downloadsFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
+                    string filePath = Path.Combine(downloadsFolder, "LCC_CostModel.xlsx");
+
+                    downloadService.DownloadLCCCostModel(expenditureData, filePath, progress);
+                });
+
+                MessageBox.Show($"File has been downloaded successfully!");
+                StatusText.Text = "Download completed!";
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"An error occurred while downloading: {ex.Message}");
+                StatusText.Text = "Error occurred!";
+            }
         }
 
-
-        // Handler for AMP Model Calculate Button
-        private void CalculateAMPModel_Click(object sender, RoutedEventArgs e)
+ 
+        private async void PMSchedule_Click(object sender, RoutedEventArgs e)
         {
-            MessageBox.Show("Calculating AMP Model...");
-            // Add your AMP Model calculation logic here
+            try
+            {
+                if (uploadedAssetDataList == null || uploadedClassDataList == null || 
+                    uploadedMaintenanceProceduresList == null || uploadedMaintenanceStrategiesList == null)
+                {
+                    MessageBox.Show("Please upload all required data before generating PM Schedule.");
+                    return;
+                }
+
+                if (ProjectStartDate == null || ProjectEndDate == null)
+                {
+                    MessageBox.Show("Please select both Project Start Date and Project End Date.");
+                    return;
+                }
+
+                ProgressBar.Value = 0;
+                StatusText.Text = "Generating PM Schedule...";
+
+                var progress = new Progress<int>(percent =>
+                {
+                    ProgressBar.Value = percent;
+                    StatusText.Text = $"Progress: {percent}%";
+                });
+
+                await Task.Run(() =>
+                {
+                    var expenditurePlanService = new ExpenditurePlanService(
+                        uploadedAssetDataList,
+                        uploadedClassDataList,
+                        uploadedMaintenanceProceduresList,
+                        uploadedMaintenanceStrategiesList,
+                        ProjectStartDate.Value,
+                        ProjectEndDate.Value,
+                        uploadedCapitalProjectsList
+                    );
+
+                    // Use the new method specifically for PM Schedule
+                    var pmScheduleData = expenditurePlanService.GeneratePMSchedule().ToList();
+
+                    if (!pmScheduleData.Any())
+                    {
+                        Dispatcher.Invoke(() => MessageBox.Show("No preventative maintenance data found."));
+                        return;
+                    }
+
+                    string downloadsFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
+                    string filePath = Path.Combine(downloadsFolder, "PM_Schedule.xlsx");
+
+                    downloadService.DownloadPreventativeMaintenance(pmScheduleData, filePath, progress);
+                });
+
+                MessageBox.Show("PM Schedule generated successfully!");
+                StatusText.Text = "PM Schedule completed!";
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"An error occurred while generating PM Schedule: {ex.Message}");
+                StatusText.Text = "Error occurred!";
+            }
         }
 
         // Handler for AMP Model Download Button
         private void DownloadAMPModel_Click(object sender, RoutedEventArgs e)
         {
             MessageBox.Show("Downloading AMP Model...");
-            // Add your AMP Model download logic here
+            // Add AMP Model download logic here
         }
 
-
-        // Handler for CalculateButton_Click (this is likely where you'll add functionality later)
-        private void CalculateButton_Click(object sender, RoutedEventArgs e)
+        // Handler for Corrective actions (Under development)
+        private void DownladCapital_Click(object sender, RoutedEventArgs e)
         {
-            MessageBox.Show("Calculation functionality is under development.");
+            try
+            {
+                downloadService.DownloadCapitalProjectsTemplate();
+                MessageBox.Show("Capital Projects template has been downloaded to your Downloads folder.");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"An error occurred during the download: {ex.Message}");
+            }
         }
 
-        // Handler for DownloadCostModelButton_Click (this is likely where you'll add functionality later)
-        private void DownloadCostModelButton_Click(object sender, RoutedEventArgs e)
+        private void UploadCapital_Click(object sender, RoutedEventArgs e)
         {
-            MessageBox.Show("Cost Model download functionality is under development.");
-        }
+            try
+            {
+                capitalProjectService.UploadCapitalProjectsData();
 
-        private void FlatButton_Click(object sender, RoutedEventArgs e)
+                uploadedCapitalProjectsList = capitalProjectService.UploadedCapitalProjects;
+
+                if (uploadedCapitalProjectsList == null || uploadedCapitalProjectsList.Count == 0)
+                {
+                    MessageBox.Show("Failed to load Capital Projects data.");
+                }
+                else
+                {
+                    MessageBox.Show($"Capital Projects data loaded successfully. Total records: {uploadedCapitalProjectsList.Count}");
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"An error occurred during Capital Projects data upload: {ex.Message}");
+            }
+        }
+        // Handler for Flat (58% PM) corrective method
+       private void FlatButton_Click(object sender, RoutedEventArgs e)
         {
-            FlatButton.Style = (Style)FindResource("SelectedCorrectiveButtonStyle");
+            FlatButton.Style = (Style)FindResource("SelectedResetButtonStyle");
             ConditionButton.Style = (Style)FindResource("ActionButtonStyle");
+            
+            // Disable and reset Reset at Refurbishment buttons
+            YesButton.IsEnabled = false;
+            NoButton.IsEnabled = false;
+            YesButton.Style = (Style)FindResource("ActionButtonStyle");
+            NoButton.Style = (Style)FindResource("ActionButtonStyle");
+
+            // Store the selected mode
+            _isFlatModeSelected = true;
         }
 
         private void ConditionButton_Click(object sender, RoutedEventArgs e)
         {
-            ConditionButton.Style = (Style)FindResource("SelectedCorrectiveButtonStyle");
+            ConditionButton.Style = (Style)FindResource("SelectedResetButtonStyle");
             FlatButton.Style = (Style)FindResource("ActionButtonStyle");
+            
+            // Enable Reset at Refurbishment buttons
+            YesButton.IsEnabled = true;
+            NoButton.IsEnabled = true;
+
+            // Store the selected mode
+            _isFlatModeSelected = false;
+        }
+
+        // Handler for Adjust Corrective method
+        private void AdjustCorrective_Click(object sender, RoutedEventArgs e)
+        {
+            if (!YesButton.IsEnabled) return; // Extra protection against clicks when disabled
+            
+            YesButton.Style = (Style)FindResource("SelectedResetButtonStyle");
+            NoButton.Style = (Style)FindResource("ActionButtonStyle");
+        }
+
+        // Handler for Leave Corrective method
+        private void LeaveCorrective_Click(object sender, RoutedEventArgs e)
+        {
+            if (!NoButton.IsEnabled) return; // Extra protection against clicks when disabled
+            
+            NoButton.Style = (Style)FindResource("SelectedResetButtonStyle");
+            YesButton.Style = (Style)FindResource("ActionButtonStyle");
         }
     }
-    
 }
