@@ -81,9 +81,14 @@ namespace CoolMangoes.Modules
             Map(m => m.MaintenanceStrategyCode).Optional();
             Map(m => m.MaintenanceType).Optional();
             Map(m => m.Statutory).Optional();
-            Map(m => m.Criticality).Optional();
             Map(m => m.PlannedStartDate).TypeConverter<NullableDateTimeConverter>().Optional();
             Map(m => m.PlannedEndDate).TypeConverter<NullableDateTimeConverter>().Optional();
+            Map(m => m.Injury).Optional();
+            Map(m => m.Environmental).Optional();
+            Map(m => m.BusinessContinuity).Optional();
+            Map(m => m.Reputation).Optional();
+            Map(m => m.LossImpactOnTheCompany).Optional();
+            Map(m => m.HighestCriticality).Optional();
         }
     }
 }

@@ -9,6 +9,8 @@ using CoolMangoes.Modules;
 using CoolMangoes.Models;
 using System.Windows.Threading;
 using System.Windows.Controls;
+using System.Text;
+using ClosedXML.Excel;
 
 namespace CoolMangoes
 {
@@ -19,6 +21,7 @@ namespace CoolMangoes
         private readonly ClassDataService classDataService;
         private readonly MaintenanceStrategiesService maintenanceStrategiesService;
         private readonly MaintenanceProceduresService maintenanceProceduresService;
+        private readonly WorkbookSheetService workbookSheetService;
 
         private List<Asset> uploadedAssetDataList;
         private List<ClassData> uploadedClassDataList;
@@ -30,12 +33,18 @@ namespace CoolMangoes
         private readonly CapitalProjectService capitalProjectService;
 
         private bool _isFlatModeSelected = false;
+        private bool _isLeaveCorrectiveSelected = false;
+        private bool _isAdjustCorrectiveSelected = false;
+
+        private List<HierarchyItem> hierarchyData;
+        private List<Expenditure> expenditures;
         
 
         public MainWindow()
         {
             InitializeComponent();
-            downloadService = new DownloadService();
+            workbookSheetService = new WorkbookSheetService();
+            downloadService = new DownloadService(workbookSheetService); 
             assetDataService = new AssetDataService();
             classDataService = new ClassDataService();
             maintenanceStrategiesService = new MaintenanceStrategiesService();
@@ -298,17 +307,8 @@ namespace CoolMangoes
         {
             try
             {
-                if (uploadedAssetDataList == null || uploadedClassDataList == null || uploadedMaintenanceProceduresList == null || uploadedMaintenanceStrategiesList == null)
-                {
-                    MessageBox.Show("Please upload all required data (Asset Data, Class Data, Maintenance Strategies, and Procedures) before calculating.");
+                if (!ValidateInputs())
                     return;
-                }
-
-                if (ProjectStartDate == null || ProjectEndDate == null)
-                {
-                    MessageBox.Show("Please select both Project Start Date and Project End Date.");
-                    return;
-                }
 
                 ProgressBar.Value = 0;
                 StatusText.Text = "Starting calculation...";
@@ -325,26 +325,41 @@ namespace CoolMangoes
                         uploadedAssetDataList,
                         uploadedClassDataList,
                         uploadedMaintenanceProceduresList,
-                        uploadedMaintenanceStrategiesList, // Pass the maintenance strategies list here
+                        uploadedMaintenanceStrategiesList,
                         ProjectStartDate.Value,
                         ProjectEndDate.Value,
-                        uploadedCapitalProjectsList
+                        uploadedCapitalProjectsList,
+                        _isFlatModeSelected,
+                        _isLeaveCorrectiveSelected,
+                        _isAdjustCorrectiveSelected
                     );
 
-                    var expenditurePlans = expenditurePlanService.GenerateExpenditurePlan();
+                    var expenditureData = expenditurePlanService.GenerateExpenditurePlan();
 
-                    string downloadsFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
+                    string downloadsFolder = Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), 
+                        "Downloads");
                     string filePath = Path.Combine(downloadsFolder, "LCC_CostModel.xlsx");
 
-                    downloadService.DownloadLCCCostModel(expenditurePlans, filePath, progress);
+                    downloadService.DownloadLCCCostModel(
+                        expenditureData,
+                        uploadedAssetDataList,
+                        uploadedClassDataList,
+                        uploadedMaintenanceStrategiesList,
+                        uploadedMaintenanceProceduresList,
+                        ProjectStartDate.Value,
+                        ProjectEndDate.Value,
+                        filePath,
+                        progress
+                    );
                 });
 
-                MessageBox.Show("Calculation completed!");
+                MessageBox.Show("Calculation completed and LCC Cost Model has been saved!");
                 StatusText.Text = "Calculation completed!";
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"An error occurred during LCC Model calculation: {ex.Message}");
+                MessageBox.Show($"An error occurred: {ex.Message}");
                 StatusText.Text = "Error occurred!";
             }
         }
@@ -354,17 +369,8 @@ namespace CoolMangoes
         {
             try
             {
-                if (uploadedAssetDataList == null || uploadedAssetDataList.Count == 0)
-                {
-                    MessageBox.Show("No data available for download.");
+                if (!ValidateInputs())
                     return;
-                }
-
-                if (ProjectStartDate == null || ProjectEndDate == null)
-                {
-                    MessageBox.Show("Please select both Project Start Date and Project End Date.");
-                    return;
-                }
 
                 ProgressBar.Value = 0;
                 StatusText.Text = "Starting download...";
@@ -385,7 +391,9 @@ namespace CoolMangoes
                         ProjectStartDate.Value, 
                         ProjectEndDate.Value,
                         uploadedCapitalProjectsList,
-                        _isFlatModeSelected
+                        _isFlatModeSelected,
+                        _isLeaveCorrectiveSelected,
+                        _isAdjustCorrectiveSelected
                     );
 
                     var expenditureData = expenditurePlanService.GenerateExpenditurePlan();
@@ -393,7 +401,17 @@ namespace CoolMangoes
                     string downloadsFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
                     string filePath = Path.Combine(downloadsFolder, "LCC_CostModel.xlsx");
 
-                    downloadService.DownloadLCCCostModel(expenditureData, filePath, progress);
+                    downloadService.DownloadLCCCostModel(
+                        expenditureData,
+                        uploadedAssetDataList,
+                        uploadedClassDataList,
+                        uploadedMaintenanceStrategiesList,
+                        uploadedMaintenanceProceduresList,
+                        ProjectStartDate.Value,
+                        ProjectEndDate.Value,
+                        filePath,
+                        progress
+                    );
                 });
 
                 MessageBox.Show($"File has been downloaded successfully!");
@@ -473,8 +491,522 @@ namespace CoolMangoes
         // Handler for AMP Model Download Button
         private void DownloadAMPModel_Click(object sender, RoutedEventArgs e)
         {
-            MessageBox.Show("Downloading AMP Model...");
-            // Add AMP Model download logic here
+            try
+            {
+                if (!ValidateInputs())
+                    return;
+
+                // Get hierarchy data - either from uploaded hierarchy or build from asset data
+                var hierarchyData = GetHierarchyData();
+                
+                // Show preview window first with a callback for AMP download
+                ShowHierarchyPreviewWithDownload(hierarchyData, () => 
+                {
+                    try
+                    {
+                        var saveFileDialog = new SaveFileDialog
+                        {
+                            Filter = "Excel files (*.xlsx)|*.xlsx",
+                            FileName = "AMPModel.xlsx"
+                        };
+
+                        if (saveFileDialog.ShowDialog() == true)
+                        {
+                            var progress = new Progress<int>(value =>
+                            {
+                                // Update progress if needed
+                            });
+                            
+                            downloadService.DownloadAMPModel(
+                                uploadedAssetDataList,
+                                uploadedClassDataList,
+                                hierarchyData,
+                                expenditures,
+                                uploadedMaintenanceStrategiesList,
+                                uploadedMaintenanceProceduresList, 
+                                ProjectStartDate.Value,
+                                ProjectEndDate.Value,
+                                saveFileDialog.FileName,
+                                progress
+                            );
+
+                            MessageBox.Show(
+                                "AMP Model has been successfully saved!",
+                                "Success",
+                                MessageBoxButton.OK,
+                                MessageBoxImage.Information);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show(
+                            $"Error saving AMP Model: {ex.Message}",
+                            "Error",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Error);
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error preparing AMP Model: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private bool ValidateInputs()
+        {
+            if (uploadedAssetDataList == null || !uploadedAssetDataList.Any())
+            {
+                MessageBox.Show("Please upload Asset Data first.");
+                return false;
+            }
+
+            if (ProjectStartDate == null || ProjectEndDate == null)
+            {
+                MessageBox.Show("Please select both Project Start Date and Project End Date.");
+                return false;
+            }
+
+            return true;
+        }
+
+        private List<HierarchyItem> GetHierarchyData()
+        {
+            // Check if hierarchy template was already uploaded
+            if (hierarchyData != null && hierarchyData.Any())
+            {
+                return hierarchyData;
+            }
+
+            // Build location hierarchy from asset data
+            return BuildLocationHierarchy(uploadedAssetDataList);
+        }
+
+        private void GenerateHierarchyLine(HierarchyItem item, string indent, bool isLast, StringBuilder preview)
+        {
+            string treeChar = isLast ? "└─" : "├─";
+            string description = item.Description ?? "";
+            string id = item.IsAssetOrParent ? item.ID : "";  // Only show ID for Asset_ID and Parent_ID
+            
+            // Combine tree visualization, description, and ID
+            preview.AppendLine($"{indent}{treeChar}{description,-70}{id}");
+            
+            for (int i = 0; i < item.Children.Count; i++)
+            {
+                string newIndent = indent + (isLast ? "  " : "│ ");
+                GenerateHierarchyLine(item.Children[i], newIndent, i == item.Children.Count - 1, preview);
+            }
+        }
+
+        private void ShowHierarchyPreview(List<HierarchyItem> hierarchyData)
+        {
+            var previewWindow = new Window
+            {
+                Title = "Hierarchy Preview",
+                Width = 800,
+                Height = 600,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Owner = this
+            };
+
+            // Create main container
+            var grid = new Grid();
+            grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+            // Create worksheet for preview
+            using (var workbook = new XLWorkbook())
+            {
+                var worksheet = workbook.Worksheets.Add("Hierarchy Preview");
+                
+                // Add headers
+                worksheet.Cell(1, 1).Value = "Description";
+                worksheet.Cell(1, 2).Value = "ID";
+                
+                // Format headers
+                var headerRow = worksheet.Row(1);
+                headerRow.Style.Font.Bold = true;
+                headerRow.Style.Fill.BackgroundColor = XLColor.LightGray;
+
+                // Add hierarchy data
+                int row = 2;
+                foreach (var item in hierarchyData)
+                {
+                    AddHierarchyToExcel(worksheet, item, "", true, ref row);
+                }
+
+                // Auto-fit columns
+                worksheet.Columns().AdjustToContents();
+                
+                // Apply grouping
+                var lastRow = worksheet.LastRowUsed().RowNumber();
+                var levelRows = new Dictionary<int, List<int>>();
+                
+                // Collect rows for each level
+                for (int i = 2; i <= lastRow; i++)
+                {
+                    string id = worksheet.Cell(i, 2).GetString();
+                    int level = GetHierarchyLevel(id);
+                    
+                    if (!levelRows.ContainsKey(level))
+                        levelRows[level] = new List<int>();
+                    levelRows[level].Add(i);
+                }
+
+                // Apply grouping for each level
+                foreach (var level in levelRows.Keys.OrderByDescending(k => k))
+                {
+                    foreach (var rowNum in levelRows[level])
+                    {
+                        int groupEnd = FindGroupEnd(worksheet, rowNum, lastRow, level);
+                        if (groupEnd > rowNum)
+                        {
+                            worksheet.Rows(rowNum, groupEnd).Group(level);
+                            worksheet.Row(rowNum).Collapse();
+                        }
+                    }
+                }
+
+                // Convert worksheet to string for preview
+                var preview = new StringBuilder();
+                for (int i = 1; i <= lastRow; i++)
+                {
+                    var description = worksheet.Cell(i, 1).GetString();
+                    var id = worksheet.Cell(i, 2).GetString();
+                    preview.AppendLine($"{description,-70}{id}");
+                }
+
+                // Add preview text box
+                var textBox = new TextBox
+                {
+                    Text = preview.ToString(),
+                    IsReadOnly = true,
+                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                    HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+                    FontFamily = new System.Windows.Media.FontFamily("Consolas"),
+                    Margin = new Thickness(5)
+                };
+                Grid.SetRow(textBox, 0);
+                grid.Children.Add(textBox);
+
+                // Add button panel
+                var buttonPanel = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    Margin = new Thickness(5)
+                };
+                Grid.SetRow(buttonPanel, 1);
+
+                // Add download button
+                var downloadButton = new Button
+                {
+                    Content = "Download Hierarchy",
+                    Padding = new Thickness(10, 5, 10, 5),
+                    Margin = new Thickness(5)
+                };
+                downloadButton.Click += (s, e) =>
+                {
+                    var saveFileDialog = new SaveFileDialog
+                    {
+                        Filter = "Excel files (*.xlsx)|*.xlsx",
+                        FileName = "BuiltHierarchy.xlsx"
+                    };
+
+                    if (saveFileDialog.ShowDialog() == true)
+                    {
+                        try
+                        {
+                            downloadService.SaveHierarchyToFile(hierarchyData, saveFileDialog.FileName);
+                            MessageBox.Show(
+                                "Hierarchy has been successfully saved!",
+                                "Success",
+                                MessageBoxButton.OK,
+                                MessageBoxImage.Information);
+                        }
+                        catch (Exception ex)
+                        {
+                            MessageBox.Show(
+                                $"Error saving hierarchy: {ex.Message}",
+                                "Error",
+                                MessageBoxButton.OK,
+                                MessageBoxImage.Error);
+                        }
+                    }
+                };
+                buttonPanel.Children.Add(downloadButton);
+
+                // Add close button
+                var closeButton = new Button
+                {
+                    Content = "Close",
+                    Padding = new Thickness(10, 5, 10, 5),
+                    Margin = new Thickness(5)
+                };
+                closeButton.Click += (s, e) => previewWindow.Close();
+                buttonPanel.Children.Add(closeButton);
+
+                grid.Children.Add(buttonPanel);
+                previewWindow.Content = grid;
+                previewWindow.ShowDialog();
+            }
+        }
+        private void AddHierarchyToExcel(IXLWorksheet worksheet, HierarchyItem item, string indent, bool isLast, ref int row)
+        {
+            string treeChar = isLast ? "└─" : "├─";
+            string description = item.Description ?? "";
+            
+            // Combine tree visualization and description
+            worksheet.Cell(row, 1).Value = indent + treeChar + description;
+            worksheet.Cell(row, 2).Value = item.IsAssetOrParent ? item.ID : "";  // Only show ID for Asset_ID and Parent_ID
+            
+            row++;
+            
+            for (int i = 0; i < item.Children.Count; i++)
+            {
+                string newIndent = indent + (isLast ? "  " : "│ ");
+                AddHierarchyToExcel(worksheet, item.Children[i], newIndent, i == item.Children.Count - 1, ref row);
+            }
+        }
+
+        private int FindGroupEnd(IXLWorksheet worksheet, int startRow, int lastRow, int parentLevel)
+        {
+            for (int i = startRow + 1; i <= lastRow; i++)
+            {
+                string id = worksheet.Cell(i, 2).GetString();
+                int currentLevel = GetHierarchyLevel(id);
+                if (currentLevel <= parentLevel)
+                {
+                    return i - 1;
+                }
+            }
+            return lastRow;
+        }
+
+        private int GetHierarchyLevel(string id)
+        {
+            if (string.IsNullOrEmpty(id)) return 0;
+            return id.Count(c => c == '-');
+        }
+
+        private List<HierarchyItem> BuildLocationHierarchy(List<Asset> assets)
+        {
+            if (assets == null || !assets.Any())
+            {
+                throw new Exception("No asset data available to build hierarchy.");
+            }
+
+            var hierarchyItems = new List<HierarchyItem>();
+            var processedNodes = new HashSet<string>();  // Track unique nodes by description + level
+            var assetIdLookup = assets.ToDictionary(a => a.Asset_ID, a => a);
+
+            // Validate Asset_IDs and Parent_IDs
+            ValidateAssetData(assets);
+
+            foreach (var asset in assets)
+            {
+                string currentParent = "";
+                int nextLevel = 1;
+
+                // Process Location1
+                if (!string.IsNullOrEmpty(asset.Location1))
+                {
+                    var nodeKey = $"L1_{asset.Location1}";
+                    if (!processedNodes.Contains(nodeKey))
+                    {
+                        hierarchyItems.Add(new HierarchyItem
+                        {
+                            ID = "",  // Locations don't have IDs
+                            Description = asset.Location1,
+                            Parent_ID = "",
+                            Level = nextLevel,
+                            Children = new List<HierarchyItem>()
+                        });
+                        processedNodes.Add(nodeKey);
+                    }
+                    currentParent = asset.Location1;
+                    nextLevel++;
+                }
+
+                // Process Location2
+                if (!string.IsNullOrEmpty(asset.Location2))
+                {
+                    var nodeKey = $"L2_{asset.Location2}";
+                    if (!processedNodes.Contains(nodeKey))
+                    {
+                        hierarchyItems.Add(new HierarchyItem
+                        {
+                            ID = "",
+                            Description = asset.Location2,
+                            Parent_ID = currentParent,
+                            Level = nextLevel,
+                            Children = new List<HierarchyItem>()
+                        });
+                        processedNodes.Add(nodeKey);
+                    }
+                    currentParent = asset.Location2;
+                    nextLevel++;
+                }
+
+                // Process Location3
+                if (!string.IsNullOrEmpty(asset.Location3))
+                {
+                    var nodeKey = $"L3_{asset.Location3}";
+                    if (!processedNodes.Contains(nodeKey))
+                    {
+                        hierarchyItems.Add(new HierarchyItem
+                        {
+                            ID = "",
+                            Description = asset.Location3,
+                            Parent_ID = currentParent,
+                            Level = nextLevel,
+                            Children = new List<HierarchyItem>()
+                        });
+                        processedNodes.Add(nodeKey);
+                    }
+                    currentParent = asset.Location3;
+                    nextLevel++;
+                }
+
+                // Process Location4
+                if (!string.IsNullOrEmpty(asset.Location4))
+                {
+                    var nodeKey = $"L4_{asset.Location4}";
+                    if (!processedNodes.Contains(nodeKey))
+                    {
+                        hierarchyItems.Add(new HierarchyItem
+                        {
+                            ID = "",
+                            Description = asset.Location4,
+                            Parent_ID = currentParent,
+                            Level = nextLevel,
+                            Children = new List<HierarchyItem>()
+                        });
+                        processedNodes.Add(nodeKey);
+                    }
+                    currentParent = asset.Location4;
+                    nextLevel++;
+                }
+
+                // Process Parent_ID if exists
+                if (!string.IsNullOrEmpty(asset.Parent_ID))
+                {
+                    var nodeKey = $"P_{asset.Parent_ID}";
+                    if (!processedNodes.Contains(nodeKey))
+                    {
+                        var parentAsset = assetIdLookup[asset.Parent_ID];
+                        hierarchyItems.Add(new HierarchyItem
+                        {
+                            ID = asset.Parent_ID,
+                            Description = parentAsset.AssetDescription,
+                            Parent_ID = currentParent,
+                            Level = nextLevel,
+                            Children = new List<HierarchyItem>(),
+                            IsAssetOrParent = true
+                        });
+                        processedNodes.Add(nodeKey);
+                    }
+                    currentParent = asset.Parent_ID;
+                    nextLevel++;
+                }
+
+                // Process Asset_ID (always last level if present)
+                var assetNodeKey = $"A_{asset.Asset_ID}";
+                if (!processedNodes.Contains(assetNodeKey))
+                {
+                    hierarchyItems.Add(new HierarchyItem
+                    {
+                        ID = asset.Asset_ID,
+                        Description = asset.AssetDescription,
+                        Parent_ID = currentParent,
+                        Level = nextLevel,
+                        Children = new List<HierarchyItem>(),
+                        IsAssetOrParent = true
+                    });
+                    processedNodes.Add(assetNodeKey);
+                }
+            }
+
+            // Build the hierarchy relationships
+            BuildHierarchyRelationships(hierarchyItems);
+
+            // Return only root level items
+            return hierarchyItems.Where(h => string.IsNullOrEmpty(h.Parent_ID)).ToList();
+        }
+
+        private void BuildHierarchyRelationships(List<HierarchyItem> items)
+        {
+            var lookup = items.ToLookup(i => i.Parent_ID);
+            foreach (var item in items)
+            {
+                item.Children = lookup[item.Description].ToList();
+            }
+        }
+
+        private void ValidateAssetData(List<Asset> assets)
+        {
+            // Check for duplicate Asset_IDs
+            var duplicateAssetIds = assets.GroupBy(a => a.Asset_ID)
+                .Where(g => g.Count() > 1)
+                .Select(g => g.Key);
+            if (duplicateAssetIds.Any())
+            {
+                throw new Exception($"Duplicate Asset_IDs found: {string.Join(", ", duplicateAssetIds)}");
+            }
+
+            // Check for invalid Parent_IDs
+            var invalidParentIds = assets
+                .Where(a => !string.IsNullOrEmpty(a.Parent_ID))
+                .Where(a => !assets.Any(asset => asset.Asset_ID == a.Parent_ID))
+                .Select(a => a.Parent_ID)
+                .Distinct();
+            if (invalidParentIds.Any())
+            {
+                throw new Exception($"Invalid Parent_IDs found: {string.Join(", ", invalidParentIds)}");
+            }
+        }
+
+
+        private void GenerateAMPModel(List<HierarchyItem> hierarchyData)
+        {
+            var ampModelDialog = new SaveFileDialog
+            {
+                Filter = "Excel files (*.xlsx)|*.xlsx",
+                DefaultExt = "xlsx",
+                FileName = "AMP_Model.xlsx"
+            };
+
+            if (ampModelDialog.ShowDialog() != true)
+                return;
+
+            var progress = new Progress<int>(value =>
+            {
+                ProgressBar.Value = value;
+                StatusText.Text = $"Generating AMP Model: {value}%";
+            });
+
+            // Create expenditure list
+            var expenditures = new List<Expenditure>();  // TODO: Populate this with actual expenditure data
+
+            downloadService.DownloadAMPModel(
+                uploadedAssetDataList,
+                uploadedClassDataList,
+                hierarchyData,
+                expenditures,
+                uploadedMaintenanceStrategiesList,
+                uploadedMaintenanceProceduresList,
+                ProjectStartDate.Value,
+                ProjectEndDate.Value,
+                ampModelDialog.FileName,
+                progress);
+
+            MessageBox.Show(
+                "AMP Model has been generated successfully!",
+                "Success",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            
+            StatusText.Text = "AMP Model generation completed!";
         }
 
         // Handler for Corrective actions (Under development)
@@ -527,6 +1059,8 @@ namespace CoolMangoes
 
             // Store the selected mode
             _isFlatModeSelected = true;
+            _isLeaveCorrectiveSelected = false;
+            _isAdjustCorrectiveSelected = false;
         }
 
         private void ConditionButton_Click(object sender, RoutedEventArgs e)
@@ -545,19 +1079,192 @@ namespace CoolMangoes
         // Handler for Adjust Corrective method
         private void AdjustCorrective_Click(object sender, RoutedEventArgs e)
         {
-            if (!YesButton.IsEnabled) return; // Extra protection against clicks when disabled
+            if (!YesButton.IsEnabled) return;
             
             YesButton.Style = (Style)FindResource("SelectedResetButtonStyle");
             NoButton.Style = (Style)FindResource("ActionButtonStyle");
+            
+            _isAdjustCorrectiveSelected = true;
+            _isLeaveCorrectiveSelected = false;
+            _isFlatModeSelected = false;
         }
 
         // Handler for Leave Corrective method
         private void LeaveCorrective_Click(object sender, RoutedEventArgs e)
         {
-            if (!NoButton.IsEnabled) return; // Extra protection against clicks when disabled
+            if (!NoButton.IsEnabled) return;
             
             NoButton.Style = (Style)FindResource("SelectedResetButtonStyle");
             YesButton.Style = (Style)FindResource("ActionButtonStyle");
+            
+            _isLeaveCorrectiveSelected = true;
+            _isAdjustCorrectiveSelected = false;
+            _isFlatModeSelected = false;
         }
+
+        private void DownladHierarchy_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var saveFileDialog = new SaveFileDialog
+                {
+                    Filter = "CSV files (*.csv)|*.csv",
+                    FileName = "HierarchyTemplate.csv"
+                };
+
+                if (saveFileDialog.ShowDialog() == true)
+                {
+                    downloadService.DownloadHierarchyTemplate(saveFileDialog.FileName);
+                    MessageBox.Show(
+                        "Hierarchy template downloaded successfully! Please fill it out and upload it back.",
+                        "Download Complete",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"Error downloading hierarchy template: {ex.Message}",
+                    "Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+        }
+
+
+        private void UploadHierarchy_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var openFileDialog = new OpenFileDialog
+                {
+                    Filter = "CSV files (*.csv)|*.csv"
+                };
+
+                if (openFileDialog.ShowDialog() == true)
+                {
+                    // Create empty list since hierarchy is independent of asset IDs
+                    var assetIds = new List<string>();
+                    hierarchyData = downloadService.ValidateHierarchyTemplate(openFileDialog.FileName, assetIds);
+                    
+                    // Show preview of hierarchy with download button
+                    ShowHierarchyPreviewWithDownload(hierarchyData);
+
+                    MessageBox.Show("Hierarchy template uploaded and validated successfully!");
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"Error uploading hierarchy template: {ex.Message}",
+                    "Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+        }
+
+        private void ShowHierarchyPreviewWithDownload(List<HierarchyItem> hierarchyData, Action onCloseCallback = null)
+        {
+            // Create preview window
+            var previewWindow = new Window
+            {
+                Title = "Hierarchy Preview",
+                Width = 800,
+                Height = 600,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Owner = this
+            };
+
+            // Add close callback if provided
+            if (onCloseCallback != null)
+            {
+                previewWindow.Closed += (s, e) => onCloseCallback();
+            }
+
+            // Create main grid
+            var grid = new Grid();
+            grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+            // Create preview text box
+            var textBox = new TextBox
+            {
+                Text = downloadService.GenerateHierarchyPreview(hierarchyData),
+                IsReadOnly = true,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+                FontFamily = new System.Windows.Media.FontFamily("Consolas"),
+                Margin = new Thickness(5)
+            };
+            Grid.SetRow(textBox, 0);
+            grid.Children.Add(textBox);
+
+            // Create button panel
+            var buttonPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Margin = new Thickness(5)
+            };
+            Grid.SetRow(buttonPanel, 1);
+
+            // Create download hierarchy button
+            var downloadButton = new Button
+            {
+                Content = "Download Hierarchy",
+                Padding = new Thickness(10, 5, 10, 5),
+                Margin = new Thickness(5)
+            };
+            
+            downloadButton.Click += (s, e) =>
+            {
+                var saveFileDialog = new SaveFileDialog
+                {
+                    Filter = "Excel files (*.xlsx)|*.xlsx",
+                    FileName = "BuiltHierarchy.xlsx"
+                };
+
+                if (saveFileDialog.ShowDialog() == true)
+                {
+                    try
+                    {
+                        downloadService.SaveHierarchyToFile(hierarchyData, saveFileDialog.FileName);
+                        MessageBox.Show(
+                            "Hierarchy has been successfully saved!",
+                            "Success",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Information);
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show(
+                            $"Error saving hierarchy: {ex.Message}",
+                            "Error",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Error);
+                    }
+                }
+            };
+            buttonPanel.Children.Add(downloadButton);
+
+            // Create close button
+            var closeButton = new Button
+            {
+                Content = "Close",
+                Padding = new Thickness(10, 5, 10, 5),
+                Margin = new Thickness(5)
+            };
+            closeButton.Click += (s, e) => previewWindow.Close();
+            buttonPanel.Children.Add(closeButton);
+
+            // Add button panel to grid
+            grid.Children.Add(buttonPanel);
+
+            // Show preview window
+            previewWindow.Content = grid;
+            previewWindow.ShowDialog();
+        }
+
     }
 }

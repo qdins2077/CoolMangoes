@@ -8,6 +8,11 @@ namespace CoolMangoes.Modules
     public class ExpenditurePlanService
     {
         private bool _isFlatModeSelected;
+        private bool _isLeaveCorrectiveSelected; 
+        private bool _isAdjustCorrectiveSelected;
+        private Dictionary<string, Dictionary<int, double>> _assetRUL; // Asset_ID -> Year -> RUL%
+        private Dictionary<string, Dictionary<int, int>> _assetLoF; // Asset_ID -> Year -> LoF
+        private Dictionary<string, HashSet<int>> _refurbishmentYears;
 
         private readonly List<Asset> _assetDataList;
         private readonly Dictionary<string, ClassData> _classDataList;
@@ -27,7 +32,9 @@ namespace CoolMangoes.Modules
             DateTime projectStartDate,
             DateTime projectEndDate,
             List<CapitalProject> capitalProjectsList,
-            bool isFlatModeSelected = false)
+            bool isFlatModeSelected = false,
+            bool isLeaveCorrectiveSelected = false,
+            bool isAdjustCorrectiveSelected = false)
         {
             _assetDataList = assetData;
             _procedureDataList = procedureData;
@@ -49,11 +56,39 @@ namespace CoolMangoes.Modules
 
             // Flat PM mode selected
             _isFlatModeSelected = isFlatModeSelected;
+
+            // Corrective without Refurbishment mode selected
+            _isLeaveCorrectiveSelected = isLeaveCorrectiveSelected;
+            _assetRUL = new Dictionary<string, Dictionary<int, double>>();
+            _assetLoF = new Dictionary<string, Dictionary<int, int>>();
+            _isAdjustCorrectiveSelected = isAdjustCorrectiveSelected;
+            _refurbishmentYears = new Dictionary<string, HashSet<int>>();
         }
 
         // Generates the expenditure plan lazily to avoid memory overflow
         public IEnumerable<Expenditure> GenerateExpenditurePlan()
         {
+            // Clear existing calculations
+            _assetRUL.Clear();
+            _assetLoF.Clear();
+            _refurbishmentYears.Clear();
+
+             // Calculate RUL and LoF for all assets if in either Corrective mode
+            if (_isLeaveCorrectiveSelected || _isAdjustCorrectiveSelected)
+            {
+                foreach (var asset in _assetDataList)
+                {
+                    if (string.IsNullOrWhiteSpace(asset.HierarchyCode) || 
+                        !_classDataList.TryGetValue(asset.HierarchyCode, out var classData))
+                    {
+                        continue;
+                    }
+                    CalculateRULAndLoF(asset, classData);
+                }
+            }
+
+            var expenditures = new List<Expenditure>();
+
             // Schedule Capital Projects without Asset_ID first
             foreach (var capitalProject in _capitalProjectsList.Where(cp => string.IsNullOrEmpty(cp.Asset_ID)))
             {
@@ -417,13 +452,184 @@ namespace CoolMangoes.Modules
                 return summariesList.Concat(cmRecords);
             }
 
-            // If not in Flat mode, return only PM records
+            else if (_isLeaveCorrectiveSelected || _isAdjustCorrectiveSelected)
+            {
+                Console.WriteLine($"Generating CM records. Mode: Leave={_isLeaveCorrectiveSelected}, Adjust={_isAdjustCorrectiveSelected}");
+                
+                var cmRecords = new List<Expenditure>();
+                foreach (var pm in summariesList)
+                {
+                    if (_assetRUL.TryGetValue(pm.Asset_ID, out var yearRUL) &&
+                        yearRUL.TryGetValue(pm.ExpenditureYear, out var rulPercentage))
+                    {
+                        double multiplier = GetCMMultiplierFromRUL(rulPercentage);
+                        Console.WriteLine($"Asset: {pm.Asset_ID}, Year: {pm.ExpenditureYear}, RUL: {rulPercentage}%, Multiplier: {multiplier}");
+                        
+                        if (multiplier > 0)
+                        {
+                            var cmValue = pm.ExpenditureValue * multiplier;
+                            cmRecords.Add(new Expenditure
+                            {
+                                Location1 = pm.Location1,
+                                Location2 = pm.Location2,
+                                Location3 = pm.Location3,
+                                Location4 = pm.Location4,
+                                Asset_ID = pm.Asset_ID,
+                                AssetDescription = pm.AssetDescription,
+                                HierarchyL1 = pm.HierarchyL1,
+                                HierarchyL2 = pm.HierarchyL2,
+                                HierarchyL3 = pm.HierarchyL3,
+                                HierarchyL4 = pm.HierarchyL4,
+                                AssetHierarchy = pm.AssetHierarchy,
+                                HierarchyCode = pm.HierarchyCode,
+                                ExpenditureValue = cmValue,
+                                AcqDate = pm.AcqDate,
+                                ExpenditureDate = pm.ExpenditureDate,
+                                ExpenditureYear = pm.ExpenditureYear,
+                                ExpenditureType = "Corrective Maintenance",
+                                ExpenditureDescription = $"{pm.AssetDescription} - CM, Yearly Cost" +
+                                    (_isAdjustCorrectiveSelected && 
+                                    _refurbishmentYears.ContainsKey(pm.Asset_ID) &&
+                                    _refurbishmentYears[pm.Asset_ID].Contains(pm.ExpenditureYear)
+                                        ? " (Post-Refurbishment)" 
+                                        : ""),
+                                Comment = ""
+                                
+                            });
+                        }
+                    }
+                }
+
+                Console.WriteLine($"Generated {cmRecords.Count} CM records");
+                return summariesList.Concat(cmRecords);
+                }
+
             return summariesList;
         }
 
+        // Add new method to calculate RUL and LoF
+        private void CalculateRULAndLoF(Asset asset, ClassData classData)
+        {
+            if (!_assetRUL.ContainsKey(asset.Asset_ID))
+            {
+                _assetRUL[asset.Asset_ID] = new Dictionary<int, double>();
+                _assetLoF[asset.Asset_ID] = new Dictionary<int, int>();
+            }
 
+            // Get replacement years first
+            var replacementYears = new HashSet<int>();
+            foreach (var expenditure in ProcessAsset(asset, classData))
+            {
+                if (expenditure.ExpenditureType == "Replacement")
+                {
+                    replacementYears.Add(expenditure.ExpenditureYear);
+                }
+            }
 
+            // Calculate refurbishment years if in Adjust mode
+            if (_isAdjustCorrectiveSelected && classData.RefurbishmentFrequency.HasValue)
+            {
+                CalculateRefurbishmentYears(asset, classData, replacementYears);
+            }
 
+            // Calculate initial RUL
+            double initialRUL;
+            if (asset.AcqDate.HasValue)
+            {
+                initialRUL = (asset.PlannedStartDate ?? _projectStartDate).Year - asset.AcqDate.Value.Year;
+                initialRUL = Math.Min(initialRUL, classData.EstimatedLife ?? 0);
+            }
+            else
+            {
+                double conditionRating = asset.ConditionRating ?? 3.0;
+                initialRUL = conditionRating switch
+                {
+                    1 => 0.95 * (classData.EstimatedLife ?? 0),
+                    2 => 0.8 * (classData.EstimatedLife ?? 0),
+                    3 => 0.6 * (classData.EstimatedLife ?? 0),
+                    4 => 0.2 * (classData.EstimatedLife ?? 0),
+                    5 => 0,
+                    _ => 0.6 * (classData.EstimatedLife ?? 0)
+                };
+            }
+
+            // Calculate RUL for each year
+            double currentRUL = initialRUL;
+            for (int year = _projectStartDate.Year; year <= _projectEndDate.Year; year++)
+            {
+                if (replacementYears.Contains(year))
+                {
+                    currentRUL = classData.EstimatedLife ?? 0;
+                }
+                else if (_isAdjustCorrectiveSelected && 
+                        _refurbishmentYears.ContainsKey(asset.Asset_ID) && 
+                        _refurbishmentYears[asset.Asset_ID].Contains(year))
+                {
+                    // Reset RUL to 80% of EstimatedLife at refurbishment years
+                    currentRUL = (classData.EstimatedLife ?? 0) * 0.8;
+                }
+
+                double rulPercentage = (currentRUL / (classData.EstimatedLife ?? 1)) * 100;
+                _assetRUL[asset.Asset_ID][year] = rulPercentage;
+                _assetLoF[asset.Asset_ID][year] = GetLoFFromRUL(rulPercentage);
+
+                currentRUL = Math.Max(0, currentRUL - 1);
+            }
+        }
+
+        private int GetLoFFromRUL(double rulPercentage)
+        {
+            if (rulPercentage >= 90) return 1;  // 100% RUL
+            if (rulPercentage >= 70) return 2;  // 80% RUL
+            if (rulPercentage >= 50) return 4;  // 60% RUL
+            if (rulPercentage >= 30) return 16; // 40% RUL
+            if (rulPercentage >= 10) return 32; // 20% RUL
+            return 64; // 0% RUL
+        }
+
+        private double GetCMMultiplierFromRUL(double rulPercentage)
+        {
+            if (rulPercentage >= 90) return 0;    // 100% RUL - no CM
+            if (rulPercentage >= 70) return 0.12; // 80% RUL
+            if (rulPercentage >= 50) return 0.24; // 60% RUL
+            if (rulPercentage >= 30) return 0.36; // 40% RUL
+            if (rulPercentage >= 10) return 0.48; // 20% RUL
+            return 0.60; // 0% RUL
+        }
+
+        private void CalculateRefurbishmentYears(Asset asset, ClassData classData, HashSet<int> replacementYears)
+        {
+            if (!_refurbishmentYears.ContainsKey(asset.Asset_ID))
+            {
+                _refurbishmentYears[asset.Asset_ID] = new HashSet<int>();
+            }
+
+            if (classData.RefurbishmentFrequency == null || classData.RefurbishmentFrequency <= 0)
+                return;
+
+            foreach (var replacementYear in replacementYears.OrderBy(y => y))
+            {
+                // Calculate refurbishment before replacement
+                int firstRefurbishment = replacementYear - (int)classData.RefurbishmentFrequency;
+                if (firstRefurbishment >= _projectStartDate.Year && firstRefurbishment < replacementYear)
+                {
+                    _refurbishmentYears[asset.Asset_ID].Add(firstRefurbishment);
+                }
+
+                // Calculate refurbishments after replacement until next replacement or project end
+                int nextReplacementYear = replacementYears
+                    .Where(y => y > replacementYear)
+                    .DefaultIfEmpty(_projectEndDate.Year + 1)
+                    .Min();
+
+                for (int refurbYear = replacementYear + (int)classData.RefurbishmentFrequency;
+                    refurbYear < nextReplacementYear && refurbYear <= _projectEndDate.Year;
+                    refurbYear += (int)classData.RefurbishmentFrequency)
+                {
+                    _refurbishmentYears[asset.Asset_ID].Add(refurbYear);
+                }
+            }
+        }
 
         // Processes assets without Capital Projects
         private IEnumerable<Expenditure> ProcessAssetWithoutCapitalProjects(Asset asset, ClassData classData, int conditionRating)

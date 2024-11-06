@@ -61,6 +61,10 @@
             "EPPlus": {
               "target": "Package",
               "version": "[7.4.1, )"
+            },
+            "System.IO.Packaging": {
+              "target": "Package",
+              "version": "[8.0.0, )"
             }
           },
           "imports": [

@@ -18,6 +18,13 @@ namespace CoolMangoes.Modules
             Map(m => m.MinCost).TypeConverter<NullableFloatConverter>().Optional();
             Map(m => m.MaxCost).TypeConverter<NullableFloatConverter>().Optional();
             Map(m => m.AvgReplacementCost).TypeConverter<NullableFloatConverter>().Optional();
+            Map(m => m.Injury).Optional();
+            Map(m => m.Environmental).Optional();
+            Map(m => m.BusinessContinuity).Optional();
+            Map(m => m.Reputation).Optional();
+            Map(m => m.LossImpactOnTheCompany).Optional();
+            Map(m => m.HighestCriticality).Optional();
+
         }
     }
 }

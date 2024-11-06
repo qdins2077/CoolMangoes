@@ -140,6 +140,9 @@
                         <TextBlock Text="Add Capital Project" FontSize="22" FontWeight="Bold" Foreground="#FF6B6B" Margin="10,15,10,5" HorizontalAlignment="Center"/> 
                         <Button Content="DownloadTemplate" Style="{StaticResource ActionButtonStyle}" Click="DownladCapital_Click"/>
                         <Button Content="Upload" Style="{StaticResource ActionButtonStyle}" Click="UploadCapital_Click"/>
+                        <TextBlock Text="Hierarchy Builder (AMP optional)" FontSize="22" FontWeight="Bold" Foreground="#FF6B6B" Margin="10,15,10,5" HorizontalAlignment="Center"/> 
+                        <Button Content="DownloadTemplate" Style="{StaticResource ActionButtonStyle}" Click="DownladHierarchy_Click"/>
+                        <Button Content="Upload" Style="{StaticResource ActionButtonStyle}" Click="UploadHierarchy_Click"/>
                     </StackPanel>
                 </Grid>
 

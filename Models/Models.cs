@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace CoolMangoes.Models
 {
@@ -32,6 +33,15 @@ namespace CoolMangoes.Models
         public int? Criticality { get; set; }
         public DateTime? PlannedStartDate { get; set; }
         public DateTime? PlannedEndDate { get; set; }
+        public string? UnderWarranty { get; set; }
+        public DateTime? WarrantyStartDate { get; set; }
+        public DateTime? WarrantyEndDate { get; set; }
+        public int? Injury { get; set; }
+        public int? Environmental { get; set; }
+        public int? BusinessContinuity { get; set; }
+        public int? Reputation { get; set; }
+        public int? LossImpactOnTheCompany { get; set; }
+        public int? HighestCriticality { get; set; }
     }
 
     public class ClassData
@@ -47,6 +57,12 @@ namespace CoolMangoes.Models
         public float? MinCost { get; set; }
         public float? MaxCost { get; set; }
         public float? AvgReplacementCost { get; set; }
+        public int? Injury { get; set; }
+        public int? Environmental { get; set; }
+        public int? BusinessContinuity { get; set; }
+        public int? Reputation { get; set; }
+        public int? LossImpactOnTheCompany { get; set; }
+        public int? HighestCriticality { get; set; }
     }
 
 
@@ -71,7 +87,10 @@ namespace CoolMangoes.Models
         public string ExpenditureType { get; set; }
         public string ExpenditureDescription { get; set; } 
         public string Comment { get; set; }
+        public double? RUL { get; set; }
+        public int? LoF { get; set; }
     }
+
     public class MaintenanceStrategy
     {
         public string StrategyCode { get; set; }
@@ -116,6 +135,16 @@ namespace CoolMangoes.Models
         public string HierarchyL4 { get; set; }
         public string AssetHierarchy { get; set; }
         public string HierarchyCode { get; set; }
+    }
+
+    public class HierarchyItem
+    {
+        public string ID { get; set; }
+        public string Description { get; set; }
+        public string Parent_ID { get; set; }
+        public List<HierarchyItem> Children { get; set; } = new List<HierarchyItem>();
+        public int Level { get; set; }
+         public bool IsAssetOrParent { get; set; }
     }
 
 }

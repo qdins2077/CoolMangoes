@@ -10,7 +10,8 @@
         "dependencies": {
           "ClosedXML": "0.104.1",
           "CsvHelper": "33.0.1",
-          "EPPlus": "7.4.1"
+          "EPPlus": "7.4.1",
+          "System.IO.Packaging": "8.0.0"
         },
         "runtime": {
           "CoolMangoes.dll": {}
