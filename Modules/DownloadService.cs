@@ -969,6 +969,12 @@ namespace CoolMangoes.Modules
         {
             using (var workbook = new XLWorkbook())
             {
+                 // Validate input parameters
+                if (assetData == null) throw new ArgumentNullException(nameof(assetData));
+                if (classData == null) throw new ArgumentNullException(nameof(classData));
+                if (expenditures == null) throw new ArgumentNullException(nameof(expenditures));
+                if (string.IsNullOrEmpty(filePath)) throw new ArgumentNullException(nameof(filePath));
+
                 // Add required sheets using passed parameters
                 _workbookSheetService.AddClassDataSheet(workbook, classData);
                 _workbookSheetService.AddMaintenanceStrategiesSheet(workbook, maintenanceStrategies);

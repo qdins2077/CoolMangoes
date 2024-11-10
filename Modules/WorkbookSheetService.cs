@@ -95,6 +95,9 @@ namespace CoolMangoes.Modules
 
             // Set white background for the entire used range
             worksheet.Range("A1:B13").Style.Fill.BackgroundColor = XLColor.White;
+
+            worksheet.Range("A7:B12").Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+            worksheet.Range("A7:B12").Style.Border.InsideBorder = XLBorderStyleValues.Thin;
         }
 
         public void AddEquipmentDataSheet(IXLWorkbook workbook, List<Asset> assetData)
@@ -122,56 +125,56 @@ namespace CoolMangoes.Modules
             {
                 new {
                     Title = "Location Information",
-                    Range = "A8:D8",
-                    HeadersRange = "A8:D9",
+                    StartColumn = "A",
+                    EndColumn = "D",
                     Color = "#00365E",
                     TextColor = XLColor.White,
                     Columns = new[] { "Location1", "Location2", "Location3", "Location4" }
                 },
                 new {
                     Title = "Equipment",
-                    Range = "E8:G8",
-                    HeadersRange = "E8:G9",
+                    StartColumn = "E",
+                    EndColumn = "G",
                     Color = "#D4E1E8",
                     TextColor = XLColor.Black,
                     Columns = new[] { "Asset_ID", "AssetDescription", "Parent_ID" }
                 },
                 new {
                     Title = "Classification Data",
-                    Range = "H8:M8",
-                    HeadersRange = "H8:M9",
+                    StartColumn = "H",
+                    EndColumn = "M",
                     Color = "#114973",
                     TextColor = XLColor.White,
                     Columns = new[] { "AssetHierarchy", "HierarchyL1", "HierarchyL2", "HierarchyL3", "HierarchyL4", "HierarchyCode" }
                 },
                 new {
                     Title = "Equipment Data",
-                    Range = "N8:U8",
-                    HeadersRange = "N8:U9",
+                    StartColumn = "N",
+                    EndColumn = "U",
                     Color = "#3DADA2",
                     TextColor = XLColor.Black,
                     Columns = new[] { "Manufacturer", "ModelNumber", "ManufSerialNo", "AcqDate", "PurchaseCost", "UnderWarranty", "WarrantyStartDate", "WarrantyEndDate" }
                 },
                 new {
                     Title = "Life Cycle Details",
-                    Range = "V8:X8",
-                    HeadersRange = "V8:X9",
+                    StartColumn = "V",
+                    EndColumn = "X",
                     Color = "#F06350",
                     TextColor = XLColor.Black,
                     Columns = new[] { "ConditionRating", "CurrentUsage", "OperatingEnvironment" }
                 },
                 new {
                     Title = "Maintenance Information",
-                    Range = "Y8:AC8",
-                    HeadersRange = "Y8:AC9",
+                    StartColumn = "Y",
+                    EndColumn = "AC",
                     Color = "#D4E1E8",
                     TextColor = XLColor.Black,
                     Columns = new[] { "ObservationDate", "PlannedStartDate", "MaintenanceStrategyCode", "MaintenanceType", "Statutory" }
                 },
                 new {
                     Title = "Criticality",
-                    Range = "AD8:AI8",
-                    HeadersRange = "AD8:AI9",
+                    StartColumn = "AD",
+                    EndColumn = "AI",
                     Color = "#12A8B2",
                     TextColor = XLColor.White,
                     Columns = new[] { "Injury", "Environmental", "BusinessContinuity", "Reputation", "LossImpactOnTheCompany", "HighestCriticality" }
@@ -182,28 +185,33 @@ namespace CoolMangoes.Modules
             foreach (var section in sections)
             {
                 // Merge and set section title
-                var titleRange = worksheet.Range(section.Range);
-                titleRange.Merge();
-                titleRange.Value = section.Title;
-                titleRange.Style.Font.Bold = true;
-                titleRange.Style.Font.FontSize = 12;
-                titleRange.Style.Font.FontColor = section.TextColor;
+                var headerRange = worksheet.Range($"{section.StartColumn}8:{section.EndColumn}8");
+                headerRange.Merge();
+                headerRange.Value = section.Title;
+                headerRange.Style.Font.Bold = true;
+                headerRange.Style.Font.FontSize = 12;
+                headerRange.Style.Font.FontColor = section.TextColor;
+                headerRange.Style.Fill.BackgroundColor = XLColor.FromHtml(section.Color);
                 
                 // Set background color for entire section
-                worksheet.Range(section.HeadersRange).Style.Fill.BackgroundColor = XLColor.FromHtml(section.Color);
+                var sectionRange = worksheet.Range($"{section.StartColumn}8:{section.EndColumn}9");
+                sectionRange.Style.Fill.BackgroundColor = XLColor.FromHtml(section.Color);
                 
                 // Add column headers
-                var startCol = XLHelper.GetColumnNumberFromLetter(section.Range.Split(':')[0][0].ToString());
+                var startCol = XLHelper.GetColumnNumberFromLetter(section.StartColumn);
                 for (int i = 0; i < section.Columns.Length; i++)
                 {
                     var cell = worksheet.Cell(9, startCol + i);
                     cell.Value = section.Columns[i];
                     cell.Style.Font.FontSize = 12;
                     cell.Style.Font.FontColor = section.TextColor;
+                    cell.Style.Fill.BackgroundColor = XLColor.FromHtml(section.Color);
                 }
 
                 // Add borders
-                worksheet.Range(section.HeadersRange).Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+                var fullRange = worksheet.Range($"{section.StartColumn}8:{section.EndColumn}9");
+                fullRange.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+                fullRange.Style.Border.InsideBorder = XLBorderStyleValues.Thin;
             }
 
             // Add asset data
@@ -259,9 +267,18 @@ namespace CoolMangoes.Modules
                 worksheet.Cell(currentRow, currentCol++).Value = asset.HighestCriticality;
 
                 // Add borders to data row
-                worksheet.Range(currentRow, 1, currentRow, 35).Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+                var dataRange = worksheet.Range($"A{currentRow}:AI{currentRow}");
+                dataRange.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+                dataRange.Style.Border.InsideBorder = XLBorderStyleValues.Thin;
                 
                 currentRow++;
+            }
+            // Add borders to entire data range
+            if (currentRow > 10)
+            {
+                var entireRange = worksheet.Range($"A8:AI{currentRow - 1}");
+                entireRange.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+                entireRange.Style.Border.InsideBorder = XLBorderStyleValues.Thin;
             }
 
             // Auto-fit columns
@@ -317,6 +334,7 @@ namespace CoolMangoes.Modules
                 cell.Style.Fill.BackgroundColor = XLColor.FromHtml(header.Value.Color);
                 cell.Style.Font.FontColor = XLColor.White;
                 cell.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+                cell.Style.Border.InsideBorder = XLBorderStyleValues.Thin;
             }
 
             // Add data
@@ -343,7 +361,15 @@ namespace CoolMangoes.Modules
                 
                 // Add borders to data row
                 worksheet.Range($"A{currentRow}:Q{currentRow}").Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+                worksheet.Range($"A{currentRow}:Q{currentRow}").Style.Border.InsideBorder = XLBorderStyleValues.Thin;
                 currentRow++;
+            }
+            // Add for entire range at the end
+            if (currentRow > 10)
+            {
+                var entireRange = worksheet.Range($"A9:Q{currentRow - 1}");
+                entireRange.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+                entireRange.Style.Border.InsideBorder = XLBorderStyleValues.Thin;
             }
         }
 
@@ -369,7 +395,10 @@ namespace CoolMangoes.Modules
                 var cell = worksheet.Cell(9, i + 1);
                 cell.Value = headers[i];
                 cell.Style.Font.FontSize = 12;
+                cell.Style.Font.FontColor = XLColor.White;
+                cell.Style.Fill.BackgroundColor = XLColor.FromHtml("#00365E");
                 cell.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+                cell.Style.Border.InsideBorder = XLBorderStyleValues.Thin;
             }
 
             // Add data
@@ -383,7 +412,16 @@ namespace CoolMangoes.Modules
                 worksheet.Cell($"E{currentRow}").Value = strategy.ResourceName;
 
                 worksheet.Range($"A{currentRow}:E{currentRow}").Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+                worksheet.Range($"A{currentRow}:E{currentRow}").Style.Border.InsideBorder = XLBorderStyleValues.Thin;
                 currentRow++;
+            }
+
+            // Add for entire range at the end
+            if (currentRow > 10)
+            {
+                var entireRange = worksheet.Range($"A9:E{currentRow - 1}");
+                entireRange.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+                entireRange.Style.Border.InsideBorder = XLBorderStyleValues.Thin;
             }
         }
 
@@ -419,6 +457,7 @@ namespace CoolMangoes.Modules
                 cell.Style.Font.FontColor = XLColor.White;
                 cell.Style.Fill.BackgroundColor = XLColor.FromHtml("#00365E");
                 cell.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+                cell.Style.Border.InsideBorder = XLBorderStyleValues.Thin;
             }
 
             // Add data
@@ -441,8 +480,16 @@ namespace CoolMangoes.Modules
                 worksheet.Cell($"N{currentRow}").Value = procedure.LastDoneDate;
 
                 worksheet.Range($"A{currentRow}:N{currentRow}").Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+                worksheet.Range($"A{currentRow}:N{currentRow}").Style.Border.InsideBorder = XLBorderStyleValues.Thin;
                 currentRow++;
-            }
+            } 
+            // Add for entire range at the end    
+            if (currentRow > 10)
+            {
+                var entireRange = worksheet.Range($"A9:N{currentRow - 1}");
+                entireRange.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+                entireRange.Style.Border.InsideBorder = XLBorderStyleValues.Thin;
+            }   
         }
     }
 }

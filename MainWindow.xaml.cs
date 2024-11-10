@@ -334,7 +334,8 @@ namespace CoolMangoes
                         _isAdjustCorrectiveSelected
                     );
 
-                    var expenditureData = expenditurePlanService.GenerateExpenditurePlan();
+                    // Store the expenditures in the class field for later use
+                    expenditures = expenditurePlanService.GenerateExpenditurePlan().ToList();
 
                     string downloadsFolder = Path.Combine(
                         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), 
@@ -342,7 +343,7 @@ namespace CoolMangoes
                     string filePath = Path.Combine(downloadsFolder, "LCC_CostModel.xlsx");
 
                     downloadService.DownloadLCCCostModel(
-                        expenditureData,
+                        expenditures,
                         uploadedAssetDataList,
                         uploadedClassDataList,
                         uploadedMaintenanceStrategiesList,
@@ -489,12 +490,19 @@ namespace CoolMangoes
         }
 
         // Handler for AMP Model Download Button
-        private void DownloadAMPModel_Click(object sender, RoutedEventArgs e)
+       private void DownloadAMPModel_Click(object sender, RoutedEventArgs e)
         {
             try
             {
                 if (!ValidateInputs())
                     return;
+
+                // Check if expenditures have been calculated
+                if (expenditures == null || !expenditures.Any())
+                {
+                    MessageBox.Show("Please calculate the LCC Model first to generate expenditures.", "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
 
                 // Get hierarchy data - either from uploaded hierarchy or build from asset data
                 var hierarchyData = GetHierarchyData();
@@ -515,6 +523,8 @@ namespace CoolMangoes
                             var progress = new Progress<int>(value =>
                             {
                                 // Update progress if needed
+                                ProgressBar.Value = value;
+                                StatusText.Text = $"Generating AMP Model: {value}%";
                             });
                             
                             downloadService.DownloadAMPModel(
